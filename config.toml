@@ -1,0 +1,33 @@
+[server]
+host = "127.0.0.1"
+port = 8080
+
+[database]
+url = "sqlite://ferrusgate.db?mode=rwc"
+max_connections = 10
+min_connections = 2
+
+[redis]
+url = "redis://127.0.0.1:6379"
+pool_size = 10
+
+[auth]
+# JWT 密钥（生产环境请使用环境变量或更安全的方式，至少32字符）
+jwt_secret = "your-secret-key-change-me-in-production-at-least-32-chars"
+# Access Token 过期时间（秒）
+access_token_expire = 3600
+# Refresh Token 过期时间（秒）
+refresh_token_expire = 2592000
+# 授权码过期时间（秒）
+authorization_code_expire = 300
+
+[cache]
+enable_memory_cache = true
+memory_cache_size = 10000
+enable_redis_cache = true
+default_ttl = 300
+
+[log]
+level = "info"
+# 日志输出格式: json 或 pretty
+format = "pretty"
