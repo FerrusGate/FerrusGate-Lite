@@ -49,6 +49,42 @@ impl Default for RegistrationConfig {
     }
 }
 
+/// 认证策略配置（从数据库读取）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuthPolicyConfig {
+    /// Access Token 过期时间（秒）
+    pub access_token_expire: i64,
+    /// Refresh Token 过期时间（秒）
+    pub refresh_token_expire: i64,
+    /// OAuth2 授权码过期时间（秒）
+    pub authorization_code_expire: i64,
+}
+
+impl Default for AuthPolicyConfig {
+    fn default() -> Self {
+        Self {
+            access_token_expire: 3600,      // 1 小时
+            refresh_token_expire: 2592000,  // 30 天
+            authorization_code_expire: 300, // 5 分钟
+        }
+    }
+}
+
+/// 缓存策略配置（从数据库读取）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachePolicyConfig {
+    /// 默认缓存过期时间（秒）
+    pub default_ttl: i64,
+}
+
+impl Default for CachePolicyConfig {
+    fn default() -> Self {
+        Self {
+            default_ttl: 300, // 5 分钟
+        }
+    }
+}
+
 /// 服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {

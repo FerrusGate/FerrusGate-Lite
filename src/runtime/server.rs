@@ -102,6 +102,24 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
                         "/settings/audit-logs",
                         web::get().to(services::settings_get_audit_logs),
                     )
+                    // 认证策略配置
+                    .route(
+                        "/settings/auth",
+                        web::get().to(services::settings_get_auth_policy_config),
+                    )
+                    .route(
+                        "/settings/auth",
+                        web::put().to(services::settings_update_auth_policy_config),
+                    )
+                    // 缓存策略配置
+                    .route(
+                        "/settings/cache",
+                        web::get().to(services::settings_get_cache_policy_config),
+                    )
+                    .route(
+                        "/settings/cache",
+                        web::put().to(services::settings_update_cache_policy_config),
+                    )
                     // 邀请码管理
                     .route("/invites", web::post().to(services::invite_create))
                     .route("/invites", web::get().to(services::invite_list))

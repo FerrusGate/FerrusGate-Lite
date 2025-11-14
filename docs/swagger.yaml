@@ -509,6 +509,104 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
 
+  /api/admin/settings/auth:
+    get:
+      tags:
+        - Admin - Settings
+      summary: 获取认证策略配置
+      description: 获取 Token 过期时间等认证相关配置
+      operationId: getAuthPolicyConfig
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthPolicyConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    put:
+      tags:
+        - Admin - Settings
+      summary: 更新认证策略配置
+      description: 更新 Token 过期时间等认证相关配置（需要管理员权限，会记录审计日志）
+      operationId: updateAuthPolicyConfig
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AuthPolicyConfig'
+      responses:
+        '200':
+          description: 配置更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/settings/cache:
+    get:
+      tags:
+        - Admin - Settings
+      summary: 获取缓存策略配置
+      description: 获取默认缓存 TTL 等缓存相关配置
+      operationId: getCachePolicyConfig
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CachePolicyConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    put:
+      tags:
+        - Admin - Settings
+      summary: 更新缓存策略配置
+      description: 更新默认缓存 TTL 等缓存相关配置（需要管理员权限，会记录审计日志）
+      operationId: updateCachePolicyConfig
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CachePolicyConfig'
+      responses:
+        '200':
+          description: 配置更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
   # ==================== Admin - Invites ====================
   /api/admin/invites:
     post:
@@ -968,6 +1066,38 @@ components:
           type: boolean
           description: 注册是否需要邀请码
           example: false
+
+    AuthPolicyConfig:
+      type: object
+      properties:
+        access_token_expire:
+          type: integer
+          format: int64
+          minimum: 60
+          description: Access Token 过期时间（秒）
+          example: 3600
+        refresh_token_expire:
+          type: integer
+          format: int64
+          minimum: 3600
+          description: Refresh Token 过期时间（秒）
+          example: 2592000
+        authorization_code_expire:
+          type: integer
+          format: int64
+          minimum: 60
+          description: OAuth2 授权码过期时间（秒）
+          example: 300
+
+    CachePolicyConfig:
+      type: object
+      properties:
+        default_ttl:
+          type: integer
+          format: int64
+          minimum: 1
+          description: 默认缓存过期时间（秒）
+          example: 300
 
     AuditLogsResponse:
       type: object

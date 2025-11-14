@@ -170,7 +170,6 @@ pub async fn login(
     storage: web::Data<Arc<SeaOrmBackend>>,
     jwt_manager: web::Data<Arc<JwtManager>>,
     cache: web::Data<Arc<CompositeCache>>,
-    config: web::Data<crate::config::AppConfig>,
 ) -> Result<HttpResponse, AppError> {
     // 1. 查找用户
     let user = storage
@@ -195,27 +194,30 @@ pub async fn login(
     // 4. 更新登录信息
     let _ = storage.update_login_info(user.id).await; // 忽略错误，不影响登录
 
-    // 5. 生成 Token
+    // 5. 读取认证策略配置（从数据库）
+    let auth_policy = storage.get_auth_policy_config().await?;
+
+    // 6. 生成 Token
     let access_token = jwt_manager.generate_token(
         user.id as i64,
-        config.auth.access_token_expire,
+        auth_policy.access_token_expire,
         Some(vec!["read".to_string(), "write".to_string()]),
         &user.role,
     )?;
 
     let refresh_token = jwt_manager.generate_token(
         user.id as i64,
-        config.auth.refresh_token_expire,
+        auth_policy.refresh_token_expire,
         Some(vec!["refresh".to_string()]),
         &user.role,
     )?;
 
-    // 6. 缓存 Token -> UserID 映射
+    // 7. 缓存 Token -> UserID 映射
     cache
         .set(
             &format!("token:{}", access_token),
             user.id.to_string(),
-            Some(config.auth.access_token_expire as u64),
+            Some(auth_policy.access_token_expire as u64),
         )
         .await;
 
@@ -225,6 +227,6 @@ pub async fn login(
         access_token,
         refresh_token,
         token_type: "Bearer".to_string(),
-        expires_in: config.auth.access_token_expire,
+        expires_in: auth_policy.access_token_expire,
     }))
 }

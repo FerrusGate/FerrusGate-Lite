@@ -50,7 +50,6 @@ pub async fn authorize(
     storage: web::Data<Arc<SeaOrmBackend>>,
     cache: web::Data<Arc<CompositeCache>>,
     jwt_manager: web::Data<Arc<JwtManager>>,
-    config: web::Data<crate::config::AppConfig>,
 ) -> Result<HttpResponse, AppError> {
     // 1. 验证 response_type
     if query.response_type != "code" {
@@ -114,13 +113,16 @@ pub async fn authorize(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    // 5. 生成授权码
+    // 5. 读取认证策略配置（从数据库）
+    let auth_policy = storage.get_auth_policy_config().await?;
+
+    // 6. 生成授权码
     let code = generate_random_token(32);
 
-    // 6. 计算过期时间
-    let expires_at = Utc::now() + Duration::seconds(config.auth.authorization_code_expire);
+    // 7. 计算过期时间
+    let expires_at = Utc::now() + Duration::seconds(auth_policy.authorization_code_expire);
 
-    // 7. 保存授权码到数据库
+    // 8. 保存授权码到数据库
     storage
         .save_auth_code(
             &code,
@@ -132,12 +134,12 @@ pub async fn authorize(
         )
         .await?;
 
-    // 8. 缓存授权码（用于快速验证）
+    // 9. 缓存授权码（用于快速验证）
     cache
         .set(
             &format!("authcode:{}", code),
             "valid".to_string(),
-            Some(config.auth.authorization_code_expire as u64),
+            Some(auth_policy.authorization_code_expire as u64),
         )
         .await;
 
@@ -147,7 +149,7 @@ pub async fn authorize(
         user_id
     );
 
-    // 9. 构造重定向 URL
+    // 10. 构造重定向 URL
     let mut redirect_url = format!("{}?code={}", query.redirect_uri, code);
     if let Some(ref state) = query.state {
         redirect_url.push_str(&format!("&state={}", state));
@@ -166,7 +168,6 @@ pub async fn token(
     storage: web::Data<Arc<SeaOrmBackend>>,
     jwt_manager: web::Data<Arc<JwtManager>>,
     cache: web::Data<Arc<CompositeCache>>,
-    config: web::Data<crate::config::AppConfig>,
 ) -> Result<HttpResponse, AppError> {
     // 1. 验证 grant_type
     if req.grant_type != "authorization_code" {
@@ -210,29 +211,32 @@ pub async fn token(
         .await?
         .ok_or(AppError::NotFound)?;
 
-    // 7. 生成 access_token 和 refresh_token
+    // 7. 读取认证策略配置（从数据库）
+    let auth_policy = storage.get_auth_policy_config().await?;
+
+    // 8. 生成 access_token 和 refresh_token
     let access_token = jwt_manager.generate_token(
         auth_data.user_id as i64,
-        config.auth.access_token_expire,
+        auth_policy.access_token_expire,
         Some(parse_scopes(&auth_data.scopes)),
         &user.role,
     )?;
 
     let refresh_token = jwt_manager.generate_token(
         auth_data.user_id as i64,
-        config.auth.refresh_token_expire,
+        auth_policy.refresh_token_expire,
         Some(vec!["refresh".to_string()]),
         &user.role,
     )?;
 
-    // 8. 保存 token 到数据库
+    // 9. 保存 token 到数据库
     let access_token_id = storage
         .save_access_token(
             &access_token,
             &auth_data.client_id,
             auth_data.user_id,
             &auth_data.scopes,
-            Utc::now() + Duration::seconds(config.auth.access_token_expire),
+            Utc::now() + Duration::seconds(auth_policy.access_token_expire),
         )
         .await?;
 
@@ -240,29 +244,29 @@ pub async fn token(
         .save_refresh_token(
             &refresh_token,
             access_token_id,
-            Utc::now() + Duration::seconds(config.auth.refresh_token_expire),
+            Utc::now() + Duration::seconds(auth_policy.refresh_token_expire),
         )
         .await?;
 
-    // 9. 缓存 token
+    // 10. 缓存 token
     cache
         .set(
             &format!("token:{}", access_token),
             auth_data.user_id.to_string(),
-            Some(config.auth.access_token_expire as u64),
+            Some(auth_policy.access_token_expire as u64),
         )
         .await;
 
-    // 10. 删除授权码缓存
+    // 11. 删除授权码缓存
     cache.delete(&format!("authcode:{}", code)).await;
 
-    // 11. 生成 OIDC ID Token（如果 scope 包含 openid）
+    // 12. 生成 OIDC ID Token（如果 scope 包含 openid）
     let id_token = if auth_data.scopes.contains("openid") {
         Some(generate_id_token(
             &user,
             &auth_data.client_id,
             &jwt_manager,
-            config.auth.access_token_expire,
+            auth_policy.access_token_expire,
         )?)
     } else {
         None
@@ -278,7 +282,7 @@ pub async fn token(
         access_token,
         refresh_token,
         token_type: "Bearer".to_string(),
-        expires_in: config.auth.access_token_expire,
+        expires_in: auth_policy.access_token_expire,
         id_token,
     }))
 }

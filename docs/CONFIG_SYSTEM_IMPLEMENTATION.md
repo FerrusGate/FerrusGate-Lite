@@ -432,6 +432,101 @@ Response 200:
 - ✅ 返回友好的成功消息
 - ⏸️ 配置更新后清除缓存（未来优化）
 
+#### 7.3 获取审计日志 ✅
+```http
+GET /api/admin/settings/audit-logs?limit=100&config_key=registration_config
+Authorization: Bearer {admin_token}
+
+Response 200:
+{
+  "logs": [
+    {
+      "id": 1,
+      "config_key": "registration_config",
+      "old_value": "{...}",
+      "new_value": "{...}",
+      "changed_by": 1,
+      "changed_at": "2025-11-14T10:30:00Z",
+      "change_type": "update"
+    }
+  ]
+}
+```
+
+**实现函数**: `get_audit_logs()`
+
+#### 7.4 获取认证策略配置 ✅
+```http
+GET /api/admin/settings/auth
+Authorization: Bearer {admin_token}
+
+Response 200:
+{
+  "access_token_expire": 3600,
+  "refresh_token_expire": 2592000,
+  "authorization_code_expire": 300
+}
+```
+
+**实现函数**: `get_auth_policy_config()`
+- ✅ 从数据库读取 Token 过期时间配置
+- ✅ 5 分钟缓存，提升性能
+
+#### 7.5 更新认证策略配置 ✅
+```http
+PUT /api/admin/settings/auth
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+  "access_token_expire": 7200,
+  "refresh_token_expire": 2592000,
+  "authorization_code_expire": 600
+}
+
+Response 200:
+{
+  "message": "Auth policy configuration updated successfully"
+}
+```
+
+**实现函数**: `update_auth_policy_config()`
+- ✅ 更新 Token 过期时间配置
+- ✅ 自动记录审计日志
+- ✅ 自动清除缓存
+- ✅ 权限验证（仅管理员可操作）
+
+#### 7.6 获取缓存策略配置 ✅
+```http
+GET /api/admin/settings/cache
+Authorization: Bearer {admin_token}
+
+Response 200:
+{
+  "default_ttl": 300
+}
+```
+
+**实现函数**: `get_cache_policy_config()`
+
+#### 7.7 更新缓存策略配置 ✅
+```http
+PUT /api/admin/settings/cache
+Authorization: Bearer {admin_token}
+Content-Type: application/json
+
+{
+  "default_ttl": 600
+}
+
+Response 200:
+{
+  "message": "Cache policy configuration updated successfully"
+}
+```
+
+**实现函数**: `update_cache_policy_config()`
+
 ---
 
 ### 8️⃣ 邀请码服务
@@ -934,6 +1029,11 @@ FerrusGate-Lite/
 管理员 API（需要 admin 权限）:
   GET    /api/admin/settings/registration      - 获取注册配置
   PUT    /api/admin/settings/registration      - 更新注册配置
+  GET    /api/admin/settings/auth              - 获取认证策略配置
+  PUT    /api/admin/settings/auth              - 更新认证策略配置
+  GET    /api/admin/settings/cache             - 获取缓存策略配置
+  PUT    /api/admin/settings/cache             - 更新缓存策略配置
+  GET    /api/admin/settings/audit-logs        - 获取配置审计日志
   POST   /api/admin/invites                    - 生成邀请码
   GET    /api/admin/invites                    - 列出邀请码
   DELETE /api/admin/invites/{code}             - 撤销邀请码

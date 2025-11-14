@@ -6,6 +6,7 @@ mod m20251114_000002_create_app_settings;
 mod m20251114_000003_create_invite_codes;
 mod m20251114_000004_create_config_audit_logs;
 mod m20251114_000005_add_user_management_fields;
+mod m20251114_000006_add_runtime_config;
 
 pub struct Migrator;
 
@@ -19,6 +20,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20251114_000003_create_invite_codes::Migration),
             Box::new(m20251114_000004_create_config_audit_logs::Migration),
             Box::new(m20251114_000005_add_user_management_fields::Migration),
+            Box::new(m20251114_000006_add_runtime_config::Migration),
         ]
     }
 }

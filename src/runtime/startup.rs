@@ -6,7 +6,7 @@ use crate::cache::{CompositeCache, MemoryCache, RedisCache};
 use crate::config::{CacheConfig, RedisConfig, get_config};
 use crate::errors::AppError;
 use crate::security::JwtManager;
-use crate::storage::{connect, run_migrations};
+use crate::storage::{SeaOrmBackend, connect, run_migrations};
 
 /// 服务器启动上下文
 pub struct StartupContext {
@@ -41,6 +41,11 @@ pub async fn prepare_server() -> Result<StartupContext, AppError> {
     // 5. 运行数据库迁移
     tracing::info!("Running database migrations...");
     run_migrations(&db).await?;
+
+    // 5.5 初始化运行时配置（如果不存在）
+    tracing::info!("Initializing runtime configurations...");
+    init_runtime_config(&db, config).await?;
+    tracing::info!("Runtime configurations initialized");
 
     // 6. 初始化缓存
     tracing::info!("Initializing cache system...");
@@ -147,4 +152,80 @@ fn check_components_status() {
     tracing::info!("  - /.well-known/openid-configuration (Discovery)");
 
     tracing::info!("==========================================");
+}
+
+/// 初始化运行时配置（如果数据库中不存在，则从 TOML 配置写入）
+async fn init_runtime_config(
+    db: &DatabaseConnection,
+    config: &crate::config::AppConfig,
+) -> Result<(), AppError> {
+    use crate::storage::entities::app_settings;
+    use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
+
+    let backend = SeaOrmBackend::new(Arc::new(db.clone()));
+
+    // 检查并初始化认证策略配置
+    let auth_configs = vec![
+        ("access_token_expire", config.auth.access_token_expire),
+        ("refresh_token_expire", config.auth.refresh_token_expire),
+        (
+            "authorization_code_expire",
+            config.auth.authorization_code_expire,
+        ),
+    ];
+
+    for (key, default_value) in auth_configs {
+        // 检查配置是否已存在
+        let exists = app_settings::Entity::find()
+            .filter(app_settings::Column::Key.eq(key))
+            .one(db)
+            .await?
+            .is_some();
+
+        if !exists {
+            tracing::info!(
+                "Initializing '{}' with default value: {}",
+                key,
+                default_value
+            );
+            // 配置不存在，从 TOML 写入默认值
+            backend
+                .set_setting(
+                    key,
+                    "int",
+                    None,
+                    Some(default_value),
+                    None,
+                    None, // 系统初始化，不记录操作者
+                )
+                .await?;
+        } else {
+            tracing::debug!("Configuration '{}' already exists", key);
+        }
+    }
+
+    // 检查并初始化缓存策略配置
+    let cache_key = "default_ttl";
+    let default_ttl = config.cache.default_ttl as i64;
+
+    let exists = app_settings::Entity::find()
+        .filter(app_settings::Column::Key.eq(cache_key))
+        .one(db)
+        .await?
+        .is_some();
+
+    if !exists {
+        tracing::info!(
+            "Initializing '{}' with default value: {}",
+            cache_key,
+            default_ttl
+        );
+        backend
+            .set_setting(cache_key, "int", None, Some(default_ttl), None, None)
+            .await?;
+    } else {
+        tracing::debug!("Configuration '{}' already exists", cache_key);
+    }
+
+    Ok(())
 }

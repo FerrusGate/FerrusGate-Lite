@@ -689,6 +689,184 @@ impl SeaOrmBackend {
         Ok(())
     }
 
+    /// 获取认证策略配置
+    pub async fn get_auth_policy_config(
+        &self,
+    ) -> Result<crate::config::AuthPolicyConfig, AppError> {
+        use crate::config::AuthPolicyConfig;
+
+        const CACHE_KEY: &str = "config:auth_policy";
+        const CACHE_TTL: u64 = 300; // 5 分钟
+
+        // 1. 尝试从缓存读取
+        if let Some(cache) = &self.cache
+            && let Some(cached) = cache.get(CACHE_KEY).await
+            && let Ok(config) = serde_json::from_str::<AuthPolicyConfig>(&cached)
+        {
+            tracing::debug!("Auth policy config loaded from cache");
+            return Ok(config);
+        }
+
+        // 2. 从数据库读取
+        let mut config = AuthPolicyConfig::default();
+
+        if let Some((_, _, Some(v), _)) = self.get_setting("access_token_expire").await? {
+            config.access_token_expire = v;
+        }
+        if let Some((_, _, Some(v), _)) = self.get_setting("refresh_token_expire").await? {
+            config.refresh_token_expire = v;
+        }
+        if let Some((_, _, Some(v), _)) = self.get_setting("authorization_code_expire").await? {
+            config.authorization_code_expire = v;
+        }
+
+        // 3. 写入缓存
+        if let Some(cache) = &self.cache
+            && let Ok(json) = serde_json::to_string(&config)
+        {
+            cache.set(CACHE_KEY, json, Some(CACHE_TTL)).await;
+            tracing::debug!("Auth policy config cached");
+        }
+
+        Ok(config)
+    }
+
+    /// 更新认证策略配置
+    pub async fn update_auth_policy_config(
+        &self,
+        config: &crate::config::AuthPolicyConfig,
+        updated_by: i64,
+    ) -> Result<(), AppError> {
+        // 获取旧配置用于审计日志
+        let old_config = self.get_auth_policy_config().await?;
+
+        self.set_setting(
+            "access_token_expire",
+            "int",
+            None,
+            Some(config.access_token_expire),
+            None,
+            Some(updated_by),
+        )
+        .await?;
+
+        self.set_setting(
+            "refresh_token_expire",
+            "int",
+            None,
+            Some(config.refresh_token_expire),
+            None,
+            Some(updated_by),
+        )
+        .await?;
+
+        self.set_setting(
+            "authorization_code_expire",
+            "int",
+            None,
+            Some(config.authorization_code_expire),
+            None,
+            Some(updated_by),
+        )
+        .await?;
+
+        // 记录审计日志
+        let old_json = serde_json::to_string(&old_config).unwrap_or_default();
+        let new_json = serde_json::to_string(&config).unwrap_or_default();
+        self.log_config_change(
+            "auth_policy_config",
+            Some(old_json),
+            Some(new_json),
+            updated_by,
+            "update",
+        )
+        .await?;
+
+        // 清除缓存
+        if let Some(cache) = &self.cache {
+            cache.delete("config:auth_policy").await;
+            tracing::debug!("Auth policy config cache invalidated");
+        }
+
+        Ok(())
+    }
+
+    /// 获取缓存策略配置
+    pub async fn get_cache_policy_config(
+        &self,
+    ) -> Result<crate::config::CachePolicyConfig, AppError> {
+        use crate::config::CachePolicyConfig;
+
+        const CACHE_KEY: &str = "config:cache_policy";
+        const CACHE_TTL: u64 = 300; // 5 分钟
+
+        // 1. 尝试从缓存读取
+        if let Some(cache) = &self.cache
+            && let Some(cached) = cache.get(CACHE_KEY).await
+            && let Ok(config) = serde_json::from_str::<CachePolicyConfig>(&cached)
+        {
+            tracing::debug!("Cache policy config loaded from cache");
+            return Ok(config);
+        }
+
+        // 2. 从数据库读取
+        let mut config = CachePolicyConfig::default();
+
+        if let Some((_, _, Some(v), _)) = self.get_setting("default_ttl").await? {
+            config.default_ttl = v;
+        }
+
+        // 3. 写入缓存
+        if let Some(cache) = &self.cache
+            && let Ok(json) = serde_json::to_string(&config)
+        {
+            cache.set(CACHE_KEY, json, Some(CACHE_TTL)).await;
+            tracing::debug!("Cache policy config cached");
+        }
+
+        Ok(config)
+    }
+
+    /// 更新缓存策略配置
+    pub async fn update_cache_policy_config(
+        &self,
+        config: &crate::config::CachePolicyConfig,
+        updated_by: i64,
+    ) -> Result<(), AppError> {
+        // 获取旧配置用于审计日志
+        let old_config = self.get_cache_policy_config().await?;
+
+        self.set_setting(
+            "default_ttl",
+            "int",
+            None,
+            Some(config.default_ttl),
+            None,
+            Some(updated_by),
+        )
+        .await?;
+
+        // 记录审计日志
+        let old_json = serde_json::to_string(&old_config).unwrap_or_default();
+        let new_json = serde_json::to_string(&config).unwrap_or_default();
+        self.log_config_change(
+            "cache_policy_config",
+            Some(old_json),
+            Some(new_json),
+            updated_by,
+            "update",
+        )
+        .await?;
+
+        // 清除缓存
+        if let Some(cache) = &self.cache {
+            cache.delete("config:cache_policy").await;
+            tracing::debug!("Cache policy config cache invalidated");
+        }
+
+        Ok(())
+    }
+
     // 邀请码管理方法
 
     /// 创建邀请码

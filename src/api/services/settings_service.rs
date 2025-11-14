@@ -2,7 +2,7 @@ use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::config::RegistrationConfig;
+use crate::config::{AuthPolicyConfig, CachePolicyConfig, RegistrationConfig};
 use crate::errors::AppError;
 use crate::security::Claims;
 use crate::storage::{SeaOrmBackend, entities::config_audit_logs};
@@ -77,4 +77,82 @@ pub async fn get_audit_logs(
     };
 
     Ok(HttpResponse::Ok().json(AuditLogsResponse { logs }))
+}
+
+/// GET /api/admin/settings/auth
+/// 获取认证策略配置
+pub async fn get_auth_policy_config(
+    storage: web::Data<Arc<SeaOrmBackend>>,
+) -> Result<HttpResponse, AppError> {
+    let config = storage.get_auth_policy_config().await?;
+    Ok(HttpResponse::Ok().json(config))
+}
+
+/// PUT /api/admin/settings/auth
+/// 更新认证策略配置
+pub async fn update_auth_policy_config(
+    req: HttpRequest,
+    config: web::Json<AuthPolicyConfig>,
+    storage: web::Data<Arc<SeaOrmBackend>>,
+) -> Result<HttpResponse, AppError> {
+    // 从请求扩展中提取 Claims（由 AdminOnly 中间件注入）
+    let claims = req
+        .extensions()
+        .get::<Claims>()
+        .cloned()
+        .ok_or(AppError::Unauthorized)?;
+
+    // 解析 user_id
+    let user_id: i64 = claims
+        .sub
+        .parse()
+        .map_err(|_| AppError::Internal("Invalid user_id in token".into()))?;
+
+    // 更新配置
+    storage
+        .update_auth_policy_config(&config.into_inner(), user_id)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(SettingsUpdateResponse {
+        message: "Auth policy configuration updated successfully".to_string(),
+    }))
+}
+
+/// GET /api/admin/settings/cache
+/// 获取缓存策略配置
+pub async fn get_cache_policy_config(
+    storage: web::Data<Arc<SeaOrmBackend>>,
+) -> Result<HttpResponse, AppError> {
+    let config = storage.get_cache_policy_config().await?;
+    Ok(HttpResponse::Ok().json(config))
+}
+
+/// PUT /api/admin/settings/cache
+/// 更新缓存策略配置
+pub async fn update_cache_policy_config(
+    req: HttpRequest,
+    config: web::Json<CachePolicyConfig>,
+    storage: web::Data<Arc<SeaOrmBackend>>,
+) -> Result<HttpResponse, AppError> {
+    // 从请求扩展中提取 Claims（由 AdminOnly 中间件注入）
+    let claims = req
+        .extensions()
+        .get::<Claims>()
+        .cloned()
+        .ok_or(AppError::Unauthorized)?;
+
+    // 解析 user_id
+    let user_id: i64 = claims
+        .sub
+        .parse()
+        .map_err(|_| AppError::Internal("Invalid user_id in token".into()))?;
+
+    // 更新配置
+    storage
+        .update_cache_policy_config(&config.into_inner(), user_id)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(SettingsUpdateResponse {
+        message: "Cache policy configuration updated successfully".to_string(),
+    }))
 }

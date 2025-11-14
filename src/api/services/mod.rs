@@ -28,7 +28,11 @@ pub use user_service::{
 // 设置管理服务
 pub use settings_service::{
     get_audit_logs as settings_get_audit_logs,
+    get_auth_policy_config as settings_get_auth_policy_config,
+    get_cache_policy_config as settings_get_cache_policy_config,
     get_registration_config as settings_get_registration_config,
+    update_auth_policy_config as settings_update_auth_policy_config,
+    update_cache_policy_config as settings_update_cache_policy_config,
     update_registration_config as settings_update_registration_config,
 };
 

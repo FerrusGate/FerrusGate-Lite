@@ -70,6 +70,10 @@
 |------|------|------|
 | GET | `/api/admin/settings/registration` | 获取注册配置 |
 | PUT | `/api/admin/settings/registration` | 更新注册配置 |
+| GET | `/api/admin/settings/auth` | 获取认证策略配置 |
+| PUT | `/api/admin/settings/auth` | 更新认证策略配置 |
+| GET | `/api/admin/settings/cache` | 获取缓存策略配置 |
+| PUT | `/api/admin/settings/cache` | 更新缓存策略配置 |
 | GET | `/api/admin/settings/audit-logs` | 获取审计日志 |
 
 ### 🎟️ 管理员 API - 邀请码（需要管理员权限）
@@ -252,6 +256,37 @@ curl -X PUT http://127.0.0.1:8080/api/admin/settings/registration \
 ```bash
 curl -X GET "http://127.0.0.1:8080/api/admin/settings/audit-logs?limit=50&config_key=registration_config" \
   -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+### 更新认证策略配置
+
+```bash
+curl -X PUT http://127.0.0.1:8080/api/admin/settings/auth \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "access_token_expire": 7200,
+    "refresh_token_expire": 2592000,
+    "authorization_code_expire": 600
+  }'
+```
+
+### 获取认证策略配置
+
+```bash
+curl -X GET http://127.0.0.1:8080/api/admin/settings/auth \
+  -H "Authorization: Bearer ADMIN_TOKEN"
+```
+
+### 更新缓存策略配置
+
+```bash
+curl -X PUT http://127.0.0.1:8080/api/admin/settings/cache \
+  -H "Authorization: Bearer ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "default_ttl": 600
+  }'
 ```
 
 ## 错误处理
