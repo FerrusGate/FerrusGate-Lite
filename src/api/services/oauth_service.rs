@@ -1,11 +1,11 @@
-use actix_web::{HttpResponse, web};
+use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
 use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::cache::CompositeCache;
 use crate::errors::AppError;
-use crate::security::{JwtManager, generate_random_token};
+use crate::security::{Claims, JwtManager, generate_random_token};
 use crate::storage::{ClientRepository, SeaOrmBackend, TokenRepository, UserRepository};
 
 #[derive(Debug, Deserialize)]
@@ -43,11 +43,13 @@ pub struct TokenResponse {
 }
 
 /// GET /oauth/authorize
-/// 生成授权码（简化版，实际应该先显示授权页面让用户确认）
+/// 生成授权码（需要用户已登录）
 pub async fn authorize(
+    req: HttpRequest,
     query: web::Query<AuthorizeRequest>,
     storage: web::Data<Arc<SeaOrmBackend>>,
     cache: web::Data<Arc<CompositeCache>>,
+    jwt_manager: web::Data<Arc<JwtManager>>,
     config: web::Data<crate::config::AppConfig>,
 ) -> Result<HttpResponse, AppError> {
     // 1. 验证 response_type
@@ -69,10 +71,48 @@ pub async fn authorize(
         return Err(AppError::InvalidRedirectUri);
     }
 
-    // 4. 这里应该验证用户身份并让用户确认授权
-    // 简化版：假设用户已登录且同意授权，使用 user_id = 1（需要实际实现 session 管理）
-    // TODO: 实现真实的用户会话验证和授权确认页面
-    let user_id = 1; // 临时硬编码
+    // 4. 从请求中提取用户身份（通过 JWT token 或 session）
+    // 优先从 Authorization header 获取 JWT
+    let user_id = if let Some(auth_header) = req.headers().get("Authorization") {
+        if let Ok(auth_str) = auth_header.to_str() {
+            if let Some(token) = auth_str.strip_prefix("Bearer ") {
+                // 验证并解析 JWT
+                let claims = jwt_manager.verify_token(token)?;
+
+                // 检查黑名单
+                if cache.exists(&format!("blacklist:{}", token)).await {
+                    return Err(AppError::Unauthorized);
+                }
+
+                claims
+                    .sub
+                    .parse::<i64>()
+                    .map_err(|_| AppError::Internal("Invalid user_id in token".into()))?
+            } else {
+                return Err(AppError::Unauthorized);
+            }
+        } else {
+            return Err(AppError::Unauthorized);
+        }
+    } else {
+        // 如果没有 Authorization header，尝试从请求扩展中获取（如果使用了认证中间件）
+        let claims = req
+            .extensions()
+            .get::<Claims>()
+            .cloned()
+            .ok_or_else(|| AppError::Unauthorized)?;
+
+        claims
+            .sub
+            .parse::<i64>()
+            .map_err(|_| AppError::Internal("Invalid user_id in token".into()))?
+    };
+
+    // 验证用户是否存在
+    storage
+        .find_by_id(user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
 
     // 5. 生成授权码
     let code = generate_random_token(32);
@@ -204,7 +244,7 @@ pub async fn token(
         )
         .await?;
 
-    // 8. 缓存 token
+    // 9. 缓存 token
     cache
         .set(
             &format!("token:{}", access_token),
@@ -213,8 +253,20 @@ pub async fn token(
         )
         .await;
 
-    // 9. 删除授权码缓存
+    // 10. 删除授权码缓存
     cache.delete(&format!("authcode:{}", code)).await;
+
+    // 11. 生成 OIDC ID Token（如果 scope 包含 openid）
+    let id_token = if auth_data.scopes.contains("openid") {
+        Some(generate_id_token(
+            &user,
+            &auth_data.client_id,
+            &jwt_manager,
+            config.auth.access_token_expire,
+        )?)
+    } else {
+        None
+    };
 
     tracing::info!(
         "Access token issued for client: {} user: {}",
@@ -227,8 +279,45 @@ pub async fn token(
         refresh_token,
         token_type: "Bearer".to_string(),
         expires_in: config.auth.access_token_expire,
-        id_token: None, // TODO: 实现 OIDC ID Token
+        id_token,
     }))
+}
+
+/// 生成 OIDC ID Token
+fn generate_id_token(
+    user: &crate::storage::entities::users::Model,
+    client_id: &str,
+    jwt_manager: &JwtManager,
+    expires_in: i64,
+) -> Result<String, AppError> {
+    use jsonwebtoken::{EncodingKey, Header, encode};
+    use serde_json::json;
+
+    let now = Utc::now();
+    let exp = (now + Duration::seconds(expires_in)).timestamp();
+    let iat = now.timestamp();
+
+    // 构造 ID Token claims
+    let claims = json!({
+        "iss": "ferrusgate",  // Issuer
+        "sub": user.id.to_string(),  // Subject (user_id)
+        "aud": client_id,  // Audience (client_id)
+        "exp": exp,  // Expiration time
+        "iat": iat,  // Issued at
+        "name": user.username,  // User name
+        "email": user.email,  // User email
+        "email_verified": true,  // Email verification status
+    });
+
+    // 使用 JWT manager 的密钥生成 token
+    let token = encode(
+        &Header::default(),
+        &claims,
+        &EncodingKey::from_secret(jwt_manager.secret().as_bytes()),
+    )
+    .map_err(|e| AppError::Internal(format!("Failed to generate ID token: {}", e)))?;
+
+    Ok(token)
 }
 
 /// 解析 scope 字符串为数组

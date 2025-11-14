@@ -70,6 +70,11 @@ impl JwtManager {
             .parse::<i64>()
             .map_err(|_| AppError::InvalidToken)
     }
+
+    /// 获取密钥（用于 ID Token 生成等场景）
+    pub fn secret(&self) -> &str {
+        &self.secret
+    }
 }
 
 #[cfg(test)]

@@ -200,7 +200,10 @@ mod tests {
             .await
             .expect("Failed to find invite")
             .expect("Invite should exist");
-        assert_eq!(invite.used_count, 1, "Used count should be 1 after first use");
+        assert_eq!(
+            invite.used_count, 1,
+            "Used count should be 1 after first use"
+        );
         assert_eq!(invite.used_by, Some(user_id), "Should record first user");
 
         // 5. 第二次使用（应该失败，已用完）
@@ -213,7 +216,10 @@ mod tests {
         let result = backend
             .verify_and_use_invite_code("TESTCODE", user2.id)
             .await;
-        assert!(result.is_err(), "Second use should fail because invite is already fully used");
+        assert!(
+            result.is_err(),
+            "Second use should fail because invite is already fully used"
+        );
     }
 
     #[tokio::test]

@@ -5,7 +5,7 @@ use std::sync::Arc;
 use crate::config::RegistrationConfig;
 use crate::errors::AppError;
 use crate::security::Claims;
-use crate::storage::{entities::config_audit_logs, SeaOrmBackend};
+use crate::storage::{SeaOrmBackend, entities::config_audit_logs};
 
 #[derive(Debug, Serialize)]
 pub struct SettingsUpdateResponse {

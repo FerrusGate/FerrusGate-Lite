@@ -1,0 +1,1237 @@
+openapi: 3.0.3
+info:
+  title: FerrusGate-Lite API
+  description: |
+    FerrusGate-Lite 是一个基于 Rust + Actix-Web 的轻量级身份认证和授权系统。
+
+    ## 功能特性
+    - 用户注册与登录
+    - JWT 认证
+    - OAuth2 授权码流程
+    - OIDC 支持
+    - 基于角色的权限控制 (RBAC)
+    - 邀请码系统
+    - 动态配置管理
+    - 审计日志
+
+    ## 认证方式
+    大部分端点需要 JWT Bearer Token 认证，在 HTTP Header 中添加：
+    ```
+    Authorization: Bearer <your_access_token>
+    ```
+  version: 1.0.0
+  contact:
+    name: FerrusGate Team
+  license:
+    name: MIT
+
+servers:
+  - url: http://127.0.0.1:8080
+    description: 本地开发服务器
+  - url: http://localhost:8080
+    description: 本地开发服务器 (localhost)
+
+tags:
+  - name: Health
+    description: 健康检查相关接口
+  - name: Auth
+    description: 用户认证相关接口
+  - name: OAuth2
+    description: OAuth2 授权相关接口
+  - name: OIDC
+    description: OpenID Connect 相关接口
+  - name: User
+    description: 用户信息管理接口（需要认证）
+  - name: Admin - Settings
+    description: 管理员 - 系统设置接口（需要管理员权限）
+  - name: Admin - Invites
+    description: 管理员 - 邀请码管理接口（需要管理员权限）
+
+paths:
+  # ==================== Health Check ====================
+  /health:
+    get:
+      tags:
+        - Health
+      summary: 基础健康检查
+      description: 检查服务是否正常运行
+      operationId: healthCheck
+      responses:
+        '200':
+          description: 服务正常运行
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  version:
+                    type: string
+                    example: 1.0.0
+
+  /health/ready:
+    get:
+      tags:
+        - Health
+      summary: 就绪探针
+      description: 检查服务是否就绪（数据库、缓存等依赖是否可用）
+      operationId: readinessCheck
+      responses:
+        '200':
+          description: 服务已就绪
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ready
+                  database:
+                    type: string
+                    enum: [connected, disconnected]
+                  cache:
+                    type: string
+                    enum: [connected, degraded]
+        '503':
+          description: 服务未就绪
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: not_ready
+                  database:
+                    type: string
+                    enum: [connected, disconnected]
+                  cache:
+                    type: string
+                    enum: [connected, degraded]
+
+  /health/live:
+    get:
+      tags:
+        - Health
+      summary: 存活探针
+      description: 检查服务进程是否存活
+      operationId: livenessCheck
+      responses:
+        '200':
+          description: 服务进程存活
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: alive
+
+  # ==================== Auth ====================
+  /api/auth/register:
+    post:
+      tags:
+        - Auth
+      summary: 用户注册
+      description: |
+        注册新用户账号。注册策略由管理员配置，可能包括：
+        - 邮箱域名白名单
+        - 用户名/密码强度要求
+        - 邀请码验证
+      operationId: register
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: 注册成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegisterResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: 用户登录
+      description: 使用用户名和密码登录，成功后返回 JWT Token
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/auth/verify-invite:
+    post:
+      tags:
+        - Auth
+      summary: 验证邀请码
+      description: 验证邀请码是否有效（公开接口，注册前验证）
+      operationId: verifyInvite
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyInviteRequest'
+      responses:
+        '200':
+          description: 验证结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/VerifyInviteResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ==================== OAuth2 ====================
+  /oauth/authorize:
+    get:
+      tags:
+        - OAuth2
+      summary: OAuth2 授权请求
+      description: |
+        OAuth2 授权码流程的第一步，生成授权码。
+
+        **注意：** 当前简化实现，实际生产环境应显示授权页面让用户确认。
+      operationId: oauthAuthorize
+      parameters:
+        - name: response_type
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [code]
+          description: 响应类型，固定为 "code"
+        - name: client_id
+          in: query
+          required: true
+          schema:
+            type: string
+          description: OAuth2 客户端 ID
+        - name: redirect_uri
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uri
+          description: 授权后重定向 URI
+        - name: scope
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 请求的权限范围（空格分隔）
+          example: "openid profile email"
+        - name: state
+          in: query
+          required: false
+          schema:
+            type: string
+          description: CSRF 防护参数，原样返回
+      responses:
+        '307':
+          description: 重定向到 redirect_uri，带上授权码
+          headers:
+            Location:
+              schema:
+                type: string
+              description: 重定向 URL，包含 code 和 state 参数
+              example: "https://example.com/callback?code=AUTH_CODE&state=xyz"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /oauth/token:
+    post:
+      tags:
+        - OAuth2
+      summary: 获取 Access Token
+      description: 使用授权码换取 Access Token 和 Refresh Token
+      operationId: oauthToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+      responses:
+        '200':
+          description: 成功获取 Token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /oauth/userinfo:
+    get:
+      tags:
+        - OAuth2
+      summary: 获取用户信息
+      description: 通过 Access Token 获取用户信息（OIDC UserInfo 端点）
+      operationId: oauthUserInfo
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserInfoResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== OIDC ====================
+  /.well-known/openid-configuration:
+    get:
+      tags:
+        - OIDC
+      summary: OpenID Connect Discovery
+      description: 返回 OIDC 服务配置信息
+      operationId: oidcDiscovery
+      responses:
+        '200':
+          description: OIDC 配置信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OpenIDConfiguration'
+
+  /.well-known/jwks.json:
+    get:
+      tags:
+        - OIDC
+      summary: JSON Web Key Set
+      description: |
+        返回用于验证 JWT 的公钥集合
+
+        **注意：** 当前使用对称密钥 (HS256)，返回空数组。生产环境应使用非对称密钥 (RS256)。
+      operationId: oidcJwks
+      responses:
+        '200':
+          description: JWKS 公钥集合
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JWKSResponse'
+
+  # ==================== User API ====================
+  /api/user/me:
+    get:
+      tags:
+        - User
+      summary: 获取当前用户信息
+      description: 获取当前登录用户的个人资料
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取用户信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/user/authorizations:
+    get:
+      tags:
+        - User
+      summary: 获取已授权应用列表
+      description: |
+        获取用户已授权的 OAuth2 应用列表
+
+        **注意：** 当前返回空列表，待实现。
+      operationId: listUserAuthorizations
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取授权列表
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AuthorizationInfo'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/user/authorizations/{client_id}:
+    delete:
+      tags:
+        - User
+      summary: 撤销应用授权
+      description: |
+        撤销对指定 OAuth2 应用的授权
+
+        **注意：** 当前为简化实现，待完善。
+      operationId: revokeUserAuthorization
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: client_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: OAuth2 客户端 ID
+      responses:
+        '204':
+          description: 撤销成功
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==================== Admin - Settings ====================
+  /api/admin/settings/registration:
+    get:
+      tags:
+        - Admin - Settings
+      summary: 获取注册配置
+      description: 获取当前的用户注册策略配置
+      operationId: getRegistrationConfig
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取配置
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    put:
+      tags:
+        - Admin - Settings
+      summary: 更新注册配置
+      description: 更新用户注册策略配置（需要管理员权限，会记录审计日志）
+      operationId: updateRegistrationConfig
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistrationConfig'
+      responses:
+        '200':
+          description: 配置更新成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/settings/audit-logs:
+    get:
+      tags:
+        - Admin - Settings
+      summary: 获取配置审计日志
+      description: 获取系统配置变更的审计日志
+      operationId: getAuditLogs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 1000
+            default: 100
+          description: 返回记录数量限制
+        - name: config_key
+          in: query
+          required: false
+          schema:
+            type: string
+          description: 筛选指定配置项的日志
+          example: "registration_config"
+      responses:
+        '200':
+          description: 成功获取审计日志
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  # ==================== Admin - Invites ====================
+  /api/admin/invites:
+    post:
+      tags:
+        - Admin - Invites
+      summary: 创建邀请码
+      description: 生成新的邀请码（需要管理员权限）
+      operationId: createInvite
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateInviteRequest'
+      responses:
+        '201':
+          description: 邀请码创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateInviteResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    get:
+      tags:
+        - Admin - Invites
+      summary: 列出所有邀请码
+      description: 获取系统中所有邀请码的列表（需要管理员权限）
+      operationId: listInvites
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取邀请码列表
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListInvitesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/invites/stats:
+    get:
+      tags:
+        - Admin - Invites
+      summary: 获取邀请码统计
+      description: 获取邀请码的统计信息（总数、已用、过期等）
+      operationId: getInviteStats
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: 成功获取统计信息
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InviteStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/admin/invites/{code}:
+    delete:
+      tags:
+        - Admin - Invites
+      summary: 撤销邀请码
+      description: 撤销指定的邀请码，使其失效（需要管理员权限）
+      operationId: revokeInvite
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: code
+          in: path
+          required: true
+          schema:
+            type: string
+          description: 邀请码
+          example: "INV-ABC123XYZ456"
+      responses:
+        '200':
+          description: 撤销成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+# ==================== Components ====================
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Access Token，格式为 "Bearer <token>"
+
+  schemas:
+    # ========== Auth Schemas ==========
+    RegisterRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          minLength: 3
+          maxLength: 32
+          description: 用户名
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+          example: "john@example.com"
+        password:
+          type: string
+          format: password
+          minLength: 8
+          description: 密码
+          example: "SecurePass123!"
+        invite_code:
+          type: string
+          nullable: true
+          description: 邀请码（如果系统启用了邀请码注册）
+          example: "INV-ABC123XYZ456"
+
+    RegisterResponse:
+      type: object
+      properties:
+        user_id:
+          type: integer
+          format: int64
+          description: 新创建的用户 ID
+          example: 42
+        message:
+          type: string
+          example: "User created successfully"
+
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: 用户名
+          example: "john_doe"
+        password:
+          type: string
+          format: password
+          description: 密码
+          example: "SecurePass123!"
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT Access Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refresh_token:
+          type: string
+          description: JWT Refresh Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          format: int64
+          description: Access Token 过期时间（秒）
+          example: 3600
+
+    # ========== OAuth2 Schemas ==========
+    TokenRequest:
+      type: object
+      required:
+        - grant_type
+        - client_id
+        - client_secret
+        - redirect_uri
+      properties:
+        grant_type:
+          type: string
+          enum: [authorization_code]
+          description: 授权类型
+          example: "authorization_code"
+        code:
+          type: string
+          description: 授权码（grant_type 为 authorization_code 时必填）
+          example: "AUTH_CODE_HERE"
+        client_id:
+          type: string
+          description: OAuth2 客户端 ID
+          example: "my_client_id"
+        client_secret:
+          type: string
+          format: password
+          description: OAuth2 客户端密钥
+          example: "my_client_secret"
+        redirect_uri:
+          type: string
+          format: uri
+          description: 重定向 URI（必须与授权请求时一致）
+          example: "https://example.com/callback"
+
+    TokenResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: JWT Access Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        refresh_token:
+          type: string
+          description: JWT Refresh Token
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        token_type:
+          type: string
+          example: "Bearer"
+        expires_in:
+          type: integer
+          format: int64
+          description: Access Token 过期时间（秒）
+          example: 3600
+        id_token:
+          type: string
+          nullable: true
+          description: OIDC ID Token（待实现）
+          example: null
+
+    # ========== OIDC Schemas ==========
+    OpenIDConfiguration:
+      type: object
+      properties:
+        issuer:
+          type: string
+          format: uri
+          example: "http://127.0.0.1:8080"
+        authorization_endpoint:
+          type: string
+          format: uri
+          example: "http://127.0.0.1:8080/oauth/authorize"
+        token_endpoint:
+          type: string
+          format: uri
+          example: "http://127.0.0.1:8080/oauth/token"
+        userinfo_endpoint:
+          type: string
+          format: uri
+          example: "http://127.0.0.1:8080/oauth/userinfo"
+        jwks_uri:
+          type: string
+          format: uri
+          example: "http://127.0.0.1:8080/.well-known/jwks.json"
+        response_types_supported:
+          type: array
+          items:
+            type: string
+          example: ["code"]
+        subject_types_supported:
+          type: array
+          items:
+            type: string
+          example: ["public"]
+        id_token_signing_alg_values_supported:
+          type: array
+          items:
+            type: string
+          example: ["HS256"]
+        scopes_supported:
+          type: array
+          items:
+            type: string
+          example: ["openid", "profile", "email"]
+        token_endpoint_auth_methods_supported:
+          type: array
+          items:
+            type: string
+          example: ["client_secret_post"]
+        claims_supported:
+          type: array
+          items:
+            type: string
+          example: ["sub", "name", "email", "email_verified"]
+
+    JWKSResponse:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            $ref: '#/components/schemas/JWK'
+          description: JSON Web Key 数组
+
+    JWK:
+      type: object
+      properties:
+        kty:
+          type: string
+          description: 密钥类型
+          example: "RSA"
+        kid:
+          type: string
+          description: 密钥 ID
+          example: "key-2024-01"
+        use:
+          type: string
+          description: 密钥用途
+          example: "sig"
+        alg:
+          type: string
+          description: 算法
+          example: "RS256"
+        n:
+          type: string
+          description: RSA 模数（Base64 URL 编码）
+        e:
+          type: string
+          description: RSA 指数（Base64 URL 编码）
+
+    UserInfoResponse:
+      type: object
+      properties:
+        sub:
+          type: string
+          description: 用户唯一标识符
+          example: "123"
+        name:
+          type: string
+          description: 用户名
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+          example: "john@example.com"
+        email_verified:
+          type: boolean
+          description: 邮箱是否已验证
+          example: true
+
+    # ========== User Schemas ==========
+    UserProfileResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 用户 ID
+          example: 123
+        username:
+          type: string
+          description: 用户名
+          example: "john_doe"
+        email:
+          type: string
+          format: email
+          description: 邮箱地址
+          example: "john@example.com"
+        created_at:
+          type: string
+          format: date-time
+          description: 账号创建时间（RFC 3339 格式）
+          example: "2024-01-15T08:30:00Z"
+
+    AuthorizationInfo:
+      type: object
+      properties:
+        client_id:
+          type: string
+          description: OAuth2 客户端 ID
+          example: "my_app"
+        client_name:
+          type: string
+          description: OAuth2 客户端名称
+          example: "My Application"
+        scopes:
+          type: array
+          items:
+            type: string
+          description: 授权的权限范围
+          example: ["read", "write"]
+        granted_at:
+          type: string
+          format: date-time
+          description: 授权时间（RFC 3339 格式）
+          example: "2024-01-15T10:20:30Z"
+
+    # ========== Settings Schemas ==========
+    RegistrationConfig:
+      type: object
+      properties:
+        allow_registration:
+          type: boolean
+          description: 是否允许用户注册
+          example: true
+        allowed_email_domains:
+          type: array
+          items:
+            type: string
+          description: 允许注册的邮箱域名白名单（空数组表示不限制）
+          example: ["example.com", "company.org"]
+        min_username_length:
+          type: integer
+          format: uint32
+          minimum: 1
+          description: 用户名最小长度
+          example: 3
+        max_username_length:
+          type: integer
+          format: uint32
+          minimum: 1
+          description: 用户名最大长度
+          example: 32
+        min_password_length:
+          type: integer
+          format: uint32
+          minimum: 1
+          description: 密码最小长度
+          example: 8
+        password_require_uppercase:
+          type: boolean
+          description: 密码是否必须包含大写字母
+          example: false
+        password_require_lowercase:
+          type: boolean
+          description: 密码是否必须包含小写字母
+          example: false
+        password_require_numbers:
+          type: boolean
+          description: 密码是否必须包含数字
+          example: false
+        password_require_special:
+          type: boolean
+          description: 密码是否必须包含特殊字符
+          example: false
+        require_invite_code:
+          type: boolean
+          description: 注册是否需要邀请码
+          example: false
+
+    AuditLogsResponse:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfigAuditLog'
+
+    ConfigAuditLog:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 日志 ID
+        config_key:
+          type: string
+          description: 配置项键名
+          example: "registration_config"
+        old_value:
+          type: string
+          nullable: true
+          description: 旧值（JSON 字符串）
+        new_value:
+          type: string
+          description: 新值（JSON 字符串）
+        changed_by:
+          type: integer
+          format: int64
+          description: 操作人用户 ID
+        changed_at:
+          type: string
+          format: date-time
+          description: 修改时间
+        reason:
+          type: string
+          nullable: true
+          description: 修改原因
+
+    # ========== Invite Schemas ==========
+    CreateInviteRequest:
+      type: object
+      properties:
+        max_uses:
+          type: integer
+          format: int32
+          nullable: true
+          minimum: 1
+          description: 最大使用次数（默认 1）
+          example: 5
+        expires_in_hours:
+          type: integer
+          format: int64
+          nullable: true
+          minimum: 1
+          description: 过期时间（小时，不设置则永不过期）
+          example: 168
+
+    CreateInviteResponse:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 生成的邀请码
+          example: "INV-ABC123XYZ456"
+        max_uses:
+          type: integer
+          format: int32
+          description: 最大使用次数
+          example: 5
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 过期时间（RFC 3339 格式）
+          example: "2024-01-22T08:30:00Z"
+
+    ListInvitesResponse:
+      type: object
+      properties:
+        invites:
+          type: array
+          items:
+            $ref: '#/components/schemas/InviteCodeInfo'
+
+    InviteCodeInfo:
+      type: object
+      properties:
+        code:
+          type: string
+          description: 邀请码
+          example: "INV-ABC123XYZ456"
+        created_by:
+          type: integer
+          format: int64
+          description: 创建者用户 ID
+          example: 1
+        used_by:
+          type: integer
+          format: int64
+          nullable: true
+          description: 最后使用者用户 ID
+          example: 42
+        used_count:
+          type: integer
+          format: int64
+          description: 已使用次数
+          example: 2
+        max_uses:
+          type: integer
+          format: int64
+          description: 最大使用次数
+          example: 5
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 过期时间（RFC 3339 格式）
+          example: "2024-01-22T08:30:00Z"
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间（RFC 3339 格式）
+          example: "2024-01-15T08:30:00Z"
+
+    VerifyInviteRequest:
+      type: object
+      required:
+        - code
+      properties:
+        code:
+          type: string
+          description: 邀请码
+          example: "INV-ABC123XYZ456"
+
+    VerifyInviteResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+          description: 邀请码是否有效
+          example: true
+        remaining_uses:
+          type: integer
+          format: int32
+          nullable: true
+          description: 剩余可用次数（无效时为 null）
+          example: 3
+        reason:
+          type: string
+          nullable: true
+          description: 无效原因（有效时为 null）
+          enum: [expired, used_up, not_found]
+          example: null
+
+    InviteStats:
+      type: object
+      properties:
+        total_count:
+          type: integer
+          format: int64
+          description: 总邀请码数
+          example: 50
+        active_count:
+          type: integer
+          format: int64
+          description: 可用邀请码数
+          example: 25
+        fully_used_count:
+          type: integer
+          format: int64
+          description: 已用完的邀请码数
+          example: 15
+        expired_count:
+          type: integer
+          format: int64
+          description: 已过期的邀请码数
+          example: 10
+        total_uses:
+          type: integer
+          format: int64
+          description: 总使用次数
+          example: 120
+        total_capacity:
+          type: integer
+          format: int64
+          description: 总容量（所有邀请码的 max_uses 之和）
+          example: 200
+        usage_rate:
+          type: integer
+          format: int32
+          description: 使用率（百分比）
+          example: 60
+
+    # ========== Common Schemas ==========
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          description: 响应消息
+          example: "Operation completed successfully"
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          description: 错误类型
+          example: "BadRequest"
+        message:
+          type: string
+          description: 错误详情
+          example: "Invalid input parameters"
+
+  # ========== Common Responses ==========
+  responses:
+    BadRequest:
+      description: 请求参数错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "BadRequest"
+            message: "Invalid input parameters"
+
+    Unauthorized:
+      description: 未认证或认证失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Unauthorized"
+            message: "Authentication required"
+
+    Forbidden:
+      description: 权限不足
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "Forbidden"
+            message: "Admin privileges required"
+
+    NotFound:
+      description: 资源不存在
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "NotFound"
+            message: "Resource not found"
+
+    InternalServerError:
+      description: 服务器内部错误
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            error: "InternalServerError"
+            message: "An unexpected error occurred"

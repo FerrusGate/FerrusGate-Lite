@@ -78,12 +78,22 @@ pub async fn discovery(config: web::Data<crate::config::AppConfig>) -> HttpRespo
 /// GET /.well-known/jwks.json
 /// JSON Web Key Set (公钥端点)
 pub async fn jwks() -> HttpResponse {
-    // TODO: 实现真实的 JWKS
-    // 当前使用对称密钥 (HS256)，生产环境应该使用非对称密钥 (RS256)
+    // 当前使用对称密钥 (HS256)，不应该公开密钥
+    // 对于对称密钥签名的 ID Token，客户端应该使用 client_secret 来验证
+    //
+    // 如果需要支持公开密钥验证，可以升级到非对称密钥算法：
+    // 1. 切换到 RS256/RS512（RSA）或 ES256（ECDSA）
+    // 2. 生成公钥/私钥对
+    // 3. 在这里返回公钥的 JWK 表示
+    //
+    // 参考实现：
+    // - 使用 ring 或 openssl 生成密钥对
+    // - 将公钥转换为 JWK 格式（包含 n, e 参数）
+    // - 添加 kid (Key ID) 支持密钥轮换
     let jwks = JWKSResponse {
         keys: vec![
-            // 对称密钥不应该公开，这里返回空数组
-            // 如果要支持 ID Token 验证，需要切换到 RS256 并公开公钥
+            // 对称密钥场景返回空数组是符合规范的
+            // 客户端应使用 client_secret 验证 ID Token
         ],
     };
 
