@@ -344,6 +344,9 @@ impl SeaOrmBackend {
         config: &crate::config::RegistrationConfig,
         updated_by: i64,
     ) -> Result<(), AppError> {
+        // 获取旧配置用于审计日志
+        let old_config = self.get_registration_config().await?;
+
         self.set_setting(
             "allow_registration",
             "bool",
@@ -437,6 +440,18 @@ impl SeaOrmBackend {
             None,
             Some(config.require_invite_code),
             Some(updated_by),
+        )
+        .await?;
+
+        // 记录审计日志
+        let old_json = serde_json::to_string(&old_config).unwrap_or_default();
+        let new_json = serde_json::to_string(&config).unwrap_or_default();
+        self.log_config_change(
+            "registration_config",
+            Some(old_json),
+            Some(new_json),
+            updated_by,
+            "update",
         )
         .await?;
 
@@ -612,6 +627,71 @@ impl SeaOrmBackend {
             total_capacity,
             usage_rate,
         })
+    }
+
+    // 配置审计日志方法
+
+    /// 记录配置变更
+    pub async fn log_config_change(
+        &self,
+        config_key: &str,
+        old_value: Option<String>,
+        new_value: Option<String>,
+        changed_by: i64,
+        change_type: &str,
+    ) -> Result<(), AppError> {
+        use super::entities::config_audit_logs;
+
+        let log = config_audit_logs::ActiveModel {
+            config_key: Set(config_key.to_string()),
+            old_value: Set(old_value),
+            new_value: Set(new_value),
+            changed_by: Set(changed_by),
+            changed_at: Set(Utc::now().into()),
+            change_type: Set(Some(change_type.to_string())),
+            ..Default::default()
+        };
+
+        log.insert(self.db.as_ref()).await?;
+        Ok(())
+    }
+
+    /// 获取配置变更历史
+    pub async fn get_config_audit_logs(
+        &self,
+        limit: Option<u64>,
+    ) -> Result<Vec<config_audit_logs::Model>, AppError> {
+        use super::entities::config_audit_logs;
+
+        let mut query = config_audit_logs::Entity::find()
+            .order_by_desc(config_audit_logs::Column::ChangedAt);
+
+        if let Some(limit) = limit {
+            query = query.limit(limit);
+        }
+
+        let logs = query.all(self.db.as_ref()).await?;
+        Ok(logs)
+    }
+
+    /// 获取特定配置键的变更历史
+    pub async fn get_config_audit_logs_by_key(
+        &self,
+        config_key: &str,
+        limit: Option<u64>,
+    ) -> Result<Vec<config_audit_logs::Model>, AppError> {
+        use super::entities::config_audit_logs;
+
+        let mut query = config_audit_logs::Entity::find()
+            .filter(config_audit_logs::Column::ConfigKey.eq(config_key))
+            .order_by_desc(config_audit_logs::Column::ChangedAt);
+
+        if let Some(limit) = limit {
+            query = query.limit(limit);
+        }
+
+        let logs = query.all(self.db.as_ref()).await?;
+        Ok(logs)
     }
 }
 

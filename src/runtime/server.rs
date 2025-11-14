@@ -98,6 +98,10 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
                         "/settings/registration",
                         web::put().to(services::settings_update_registration_config),
                     )
+                    .route(
+                        "/settings/audit-logs",
+                        web::get().to(services::settings_get_audit_logs),
+                    )
                     // 邀请码管理
                     .route("/invites", web::post().to(services::invite_create))
                     .route("/invites", web::get().to(services::invite_list))

@@ -1,11 +1,11 @@
 use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::config::RegistrationConfig;
 use crate::errors::AppError;
 use crate::security::Claims;
-use crate::storage::SeaOrmBackend;
+use crate::storage::{entities::config_audit_logs, SeaOrmBackend};
 
 #[derive(Debug, Serialize)]
 pub struct SettingsUpdateResponse {
@@ -49,4 +49,32 @@ pub async fn update_registration_config(
     Ok(HttpResponse::Ok().json(SettingsUpdateResponse {
         message: "Configuration updated successfully".to_string(),
     }))
+}
+
+#[derive(Debug, Deserialize)]
+pub struct AuditLogsQuery {
+    pub limit: Option<u64>,
+    pub config_key: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct AuditLogsResponse {
+    pub logs: Vec<config_audit_logs::Model>,
+}
+
+/// GET /api/admin/settings/audit-logs
+/// 获取配置变更审计日志
+pub async fn get_audit_logs(
+    query: web::Query<AuditLogsQuery>,
+    storage: web::Data<Arc<SeaOrmBackend>>,
+) -> Result<HttpResponse, AppError> {
+    let logs = if let Some(config_key) = &query.config_key {
+        storage
+            .get_config_audit_logs_by_key(config_key, query.limit)
+            .await?
+    } else {
+        storage.get_config_audit_logs(query.limit).await?
+    };
+
+    Ok(HttpResponse::Ok().json(AuditLogsResponse { logs }))
 }
