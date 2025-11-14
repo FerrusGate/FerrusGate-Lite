@@ -1,11 +1,11 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
-use crate::errors::AppError;
-use crate::security::{PasswordManager, JwtManager};
-use crate::storage::{UserRepository, SeaOrmBackend};
 use crate::cache::CompositeCache;
+use crate::errors::AppError;
+use crate::security::{JwtManager, PasswordManager};
+use crate::storage::{SeaOrmBackend, UserRepository};
 
 #[derive(Debug, Deserialize)]
 pub struct RegisterRequest {
@@ -52,7 +52,9 @@ pub async fn register(
     let password_hash = PasswordManager::hash_password(&req.password)?;
 
     // 3. 创建用户
-    let user = storage.create(&req.username, &req.email, &password_hash).await?;
+    let user = storage
+        .create(&req.username, &req.email, &password_hash)
+        .await?;
 
     tracing::info!("User registered: {} (id: {})", user.username, user.id);
 
@@ -95,11 +97,13 @@ pub async fn login(
     )?;
 
     // 4. 缓存 Token -> UserID 映射
-    cache.set(
-        &format!("token:{}", access_token),
-        user.id.to_string(),
-        Some(config.auth.access_token_expire as u64),
-    ).await;
+    cache
+        .set(
+            &format!("token:{}", access_token),
+            user.id.to_string(),
+            Some(config.auth.access_token_expire as u64),
+        )
+        .await;
 
     tracing::info!("User logged in: {} (id: {})", user.username, user.id);
 

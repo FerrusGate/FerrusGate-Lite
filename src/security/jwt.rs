@@ -1,12 +1,12 @@
-use jsonwebtoken::{encode, decode, Header, Validation, EncodingKey, DecodingKey, Algorithm};
-use serde::{Deserialize, Serialize};
 use crate::errors::AppError;
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Claims {
-    pub sub: String,           // user_id
-    pub exp: i64,              // 过期时间戳
-    pub iat: i64,              // 签发时间戳
+    pub sub: String,                // user_id
+    pub exp: i64,                   // 过期时间戳
+    pub iat: i64,                   // 签发时间戳
     pub scope: Option<Vec<String>>, // 权限范围（可选）
 }
 
@@ -20,7 +20,12 @@ impl JwtManager {
     }
 
     /// 生成 JWT Token
-    pub fn generate_token(&self, user_id: i64, expire_in: i64, scope: Option<Vec<String>>) -> Result<String, AppError> {
+    pub fn generate_token(
+        &self,
+        user_id: i64,
+        expire_in: i64,
+        scope: Option<Vec<String>>,
+    ) -> Result<String, AppError> {
         let now = chrono::Utc::now().timestamp();
         let claims = Claims {
             sub: user_id.to_string(),
@@ -32,7 +37,7 @@ impl JwtManager {
         encode(
             &Header::default(),
             &claims,
-            &EncodingKey::from_secret(self.secret.as_bytes())
+            &EncodingKey::from_secret(self.secret.as_bytes()),
         )
         .map_err(|e| AppError::Internal(format!("JWT encode failed: {}", e)))
     }
@@ -45,7 +50,7 @@ impl JwtManager {
         decode::<Claims>(
             token,
             &DecodingKey::from_secret(self.secret.as_bytes()),
-            &validation
+            &validation,
         )
         .map(|data| data.claims)
         .map_err(|e| match e.kind() {
@@ -57,7 +62,9 @@ impl JwtManager {
     /// 提取 Token 中的 user_id
     pub fn extract_user_id(&self, token: &str) -> Result<i64, AppError> {
         let claims = self.verify_token(token)?;
-        claims.sub.parse::<i64>()
+        claims
+            .sub
+            .parse::<i64>()
             .map_err(|_| AppError::InvalidToken)
     }
 }

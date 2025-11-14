@@ -1,15 +1,15 @@
 use actix_web::{
-    dev::{forward_ready, Service, ServiceRequest, ServiceResponse, Transform},
     Error, HttpMessage,
+    dev::{Service, ServiceRequest, ServiceResponse, Transform, forward_ready},
 };
 use futures_util::future::LocalBoxFuture;
-use std::sync::Arc;
+use std::future::{Ready, ready};
 use std::rc::Rc;
-use std::future::{ready, Ready};
+use std::sync::Arc;
 
-use crate::errors::AppError;
-use crate::security::{JwtManager, Claims};
 use crate::cache::CompositeCache;
+use crate::errors::AppError;
+use crate::security::{Claims, JwtManager};
 
 /// JWT 认证中间件
 pub struct JwtAuth {
@@ -80,7 +80,8 @@ where
             }
 
             // 验证 JWT
-            let claims = jwt_manager.verify_token(&token)
+            let claims = jwt_manager
+                .verify_token(&token)
                 .map_err(|e| -> Error { e.into() })?;
 
             // 将 Claims 注入到请求扩展中

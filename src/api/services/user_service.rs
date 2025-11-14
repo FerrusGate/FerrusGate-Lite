@@ -1,10 +1,10 @@
-use actix_web::{web, HttpResponse, HttpRequest, HttpMessage};
+use actix_web::{HttpMessage, HttpRequest, HttpResponse, web};
 use serde::Serialize;
 use std::sync::Arc;
 
 use crate::errors::AppError;
 use crate::security::Claims;
-use crate::storage::{UserRepository, SeaOrmBackend};
+use crate::storage::{SeaOrmBackend, UserRepository};
 
 #[derive(Debug, Serialize)]
 pub struct UserProfileResponse {

@@ -31,3 +31,5 @@ default_ttl = 300
 level = "info"
 # 日志输出格式: json 或 pretty
 format = "pretty"
+enable_rotation = false
+max_backups = 7

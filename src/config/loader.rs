@@ -1,6 +1,6 @@
-use std::fs;
 use crate::config::structs::AppConfig;
 use crate::errors::AppError;
+use std::fs;
 
 impl AppConfig {
     /// 从文件加载配置
@@ -23,13 +23,13 @@ impl AppConfig {
     pub fn validate(&self) -> Result<(), AppError> {
         if self.auth.jwt_secret.len() < 32 {
             return Err(AppError::Config(
-                "JWT secret must be at least 32 characters".into()
+                "JWT secret must be at least 32 characters".into(),
             ));
         }
 
         if self.auth.access_token_expire <= 0 {
             return Err(AppError::Config(
-                "Access token expire time must be positive".into()
+                "Access token expire time must be positive".into(),
             ));
         }
 

@@ -1,12 +1,12 @@
-use actix_web::{web, HttpResponse};
+use actix_web::{HttpResponse, web};
+use chrono::{Duration, Utc};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use chrono::{Utc, Duration};
 
+use crate::cache::CompositeCache;
 use crate::errors::AppError;
 use crate::security::{JwtManager, generate_random_token};
-use crate::storage::{ClientRepository, TokenRepository, SeaOrmBackend};
-use crate::cache::CompositeCache;
+use crate::storage::{ClientRepository, SeaOrmBackend, TokenRepository};
 
 #[derive(Debug, Deserialize)]
 pub struct AuthorizeRequest {
@@ -62,7 +62,10 @@ pub async fn authorize(
         .ok_or(AppError::InvalidClient)?;
 
     // 3. 验证 redirect_uri
-    if !storage.verify_redirect_uri(&query.client_id, &query.redirect_uri).await? {
+    if !storage
+        .verify_redirect_uri(&query.client_id, &query.redirect_uri)
+        .await?
+    {
         return Err(AppError::InvalidRedirectUri);
     }
 
@@ -131,7 +134,10 @@ pub async fn token(
     }
 
     // 2. 验证授权码
-    let code = req.code.as_ref().ok_or(AppError::BadRequest("Missing code".into()))?;
+    let code = req
+        .code
+        .as_ref()
+        .ok_or(AppError::BadRequest("Missing code".into()))?;
 
     let auth_data = storage
         .consume_auth_code(code)

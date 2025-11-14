@@ -2,7 +2,7 @@ pub mod jwt;
 pub mod password;
 pub mod token;
 
-pub use jwt::{JwtManager, Claims};
+pub use jwt::{Claims, JwtManager};
 pub use password::PasswordManager;
 pub use token::{
     generate_auth_code,

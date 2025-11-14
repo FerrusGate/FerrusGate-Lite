@@ -5,8 +5,8 @@ use crate::cache::traits::Cache;
 
 /// 组合缓存（L1 内存 + L2 Redis）
 pub struct CompositeCache {
-    l1: Arc<dyn Cache>,  // 内存缓存
-    l2: Arc<dyn Cache>,  // Redis 缓存
+    l1: Arc<dyn Cache>, // 内存缓存
+    l2: Arc<dyn Cache>, // Redis 缓存
 }
 
 impl CompositeCache {

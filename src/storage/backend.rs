@@ -1,10 +1,10 @@
 use async_trait::async_trait;
+use chrono::Utc;
 use sea_orm::*;
 use std::sync::Arc;
-use chrono::Utc;
 
-use super::repository::*;
 use super::entities::{prelude::*, *};
+use super::repository::*;
 use crate::errors::AppError;
 
 /// SeaORM 存储后端
@@ -20,7 +20,12 @@ impl SeaOrmBackend {
 
 #[async_trait]
 impl UserRepository for SeaOrmBackend {
-    async fn create(&self, username: &str, email: &str, password_hash: &str) -> Result<users::Model, AppError> {
+    async fn create(
+        &self,
+        username: &str,
+        email: &str,
+        password_hash: &str,
+    ) -> Result<users::Model, AppError> {
         let now = Utc::now();
         let user = users::ActiveModel {
             username: Set(username.to_string()),
@@ -36,9 +41,7 @@ impl UserRepository for SeaOrmBackend {
     }
 
     async fn find_by_id(&self, id: i32) -> Result<Option<users::Model>, AppError> {
-        let user = Users::find_by_id(id)
-            .one(self.db.as_ref())
-            .await?;
+        let user = Users::find_by_id(id).one(self.db.as_ref()).await?;
         Ok(user)
     }
 
@@ -61,7 +64,10 @@ impl UserRepository for SeaOrmBackend {
 
 #[async_trait]
 impl ClientRepository for SeaOrmBackend {
-    async fn find_by_client_id(&self, client_id: &str) -> Result<Option<o_auth_clients::Model>, AppError> {
+    async fn find_by_client_id(
+        &self,
+        client_id: &str,
+    ) -> Result<Option<o_auth_clients::Model>, AppError> {
         let client = OAuthClients::find()
             .filter(o_auth_clients::Column::ClientId.eq(client_id))
             .one(self.db.as_ref())
@@ -69,13 +75,16 @@ impl ClientRepository for SeaOrmBackend {
         Ok(client)
     }
 
-    async fn verify_redirect_uri(&self, client_id: &str, redirect_uri: &str) -> Result<bool, AppError> {
+    async fn verify_redirect_uri(
+        &self,
+        client_id: &str,
+        redirect_uri: &str,
+    ) -> Result<bool, AppError> {
         let client = self.find_by_client_id(client_id).await?;
 
         if let Some(client) = client {
             // redirect_uris 是 JSON array 字符串，解析后验证
-            let uris: Vec<String> = serde_json::from_str(&client.redirect_uris)
-                .unwrap_or_default();
+            let uris: Vec<String> = serde_json::from_str(&client.redirect_uris).unwrap_or_default();
             Ok(uris.contains(&redirect_uri.to_string()))
         } else {
             Ok(false)
@@ -110,7 +119,10 @@ impl TokenRepository for SeaOrmBackend {
         Ok(())
     }
 
-    async fn consume_auth_code(&self, code: &str) -> Result<Option<authorization_codes::Model>, AppError> {
+    async fn consume_auth_code(
+        &self,
+        code: &str,
+    ) -> Result<Option<authorization_codes::Model>, AppError> {
         let auth_code = AuthorizationCodes::find()
             .filter(authorization_codes::Column::Code.eq(code))
             .filter(authorization_codes::Column::Used.eq(false))

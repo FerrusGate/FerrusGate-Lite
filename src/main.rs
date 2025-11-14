@@ -1,5 +1,5 @@
-use ferrusgate_lite::{AppConfig, AppError};
 use ferrusgate_lite::runtime::{prepare_server, run_server};
+use ferrusgate_lite::{AppConfig, AppError};
 
 #[actix_web::main]
 async fn main() -> Result<(), AppError> {
@@ -12,7 +12,8 @@ async fn main() -> Result<(), AppError> {
     tracing::info!("🚀 FerrusGate-Lite is ready!");
 
     // 启动 HTTP 服务器
-    run_server(ctx).await
+    run_server(ctx)
+        .await
         .map_err(|e| AppError::Internal(format!("Server error: {}", e)))?;
 
     Ok(())
