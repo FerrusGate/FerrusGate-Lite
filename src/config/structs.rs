@@ -17,6 +17,38 @@ pub struct AppConfig {
     pub log: LogConfig,
 }
 
+/// 注册配置（从数据库读取）
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistrationConfig {
+    pub allow_registration: bool,
+    pub allowed_email_domains: Vec<String>, // 空数组表示不限制
+    pub min_username_length: u32,
+    pub max_username_length: u32,
+    pub min_password_length: u32,
+    pub password_require_uppercase: bool,
+    pub password_require_lowercase: bool,
+    pub password_require_numbers: bool,
+    pub password_require_special: bool,
+    pub require_invite_code: bool,
+}
+
+impl Default for RegistrationConfig {
+    fn default() -> Self {
+        Self {
+            allow_registration: true,
+            allowed_email_domains: vec![],
+            min_username_length: 3,
+            max_username_length: 32,
+            min_password_length: 8,
+            password_require_uppercase: false,
+            password_require_lowercase: false,
+            password_require_numbers: false,
+            password_require_special: false,
+            require_invite_code: false,
+        }
+    }
+}
+
 /// 服务器配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {

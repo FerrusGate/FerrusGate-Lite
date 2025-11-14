@@ -4,39 +4,30 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "access_tokens")]
+#[sea_orm(table_name = "config_audit_logs")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
-    #[sea_orm(column_type = "Text")]
-    pub token: String,
-    pub token_type: String,
-    pub client_id: String,
-    pub user_id: i64,
-    #[sea_orm(column_type = "Text")]
-    pub scopes: String,
-    pub expires_at: DateTimeWithTimeZone,
-    pub created_at: DateTimeWithTimeZone,
+    pub config_key: String,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub old_value: Option<String>,
+    #[sea_orm(column_type = "Text", nullable)]
+    pub new_value: Option<String>,
+    pub changed_by: i64,
+    pub changed_at: DateTimeWithTimeZone,
+    pub change_type: Option<String>,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {
-    #[sea_orm(has_many = "super::refresh_tokens::Entity")]
-    RefreshTokens,
     #[sea_orm(
         belongs_to = "super::users::Entity",
-        from = "Column::UserId",
+        from = "Column::ChangedBy",
         to = "super::users::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
     Users,
-}
-
-impl Related<super::refresh_tokens::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::RefreshTokens.def()
-    }
 }
 
 impl Related<super::users::Entity> for Entity {

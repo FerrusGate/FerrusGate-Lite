@@ -8,7 +8,7 @@ use crate::storage::{SeaOrmBackend, UserRepository};
 
 #[derive(Debug, Serialize)]
 pub struct UserProfileResponse {
-    pub id: i32,
+    pub id: i64,
     pub username: String,
     pub email: String,
     pub created_at: String,
@@ -36,7 +36,7 @@ pub async fn get_profile(
         .ok_or(AppError::Unauthorized)?;
 
     // 解析 user_id
-    let user_id: i32 = claims
+    let user_id: i64 = claims
         .sub
         .parse()
         .map_err(|_| AppError::Internal("Invalid user_id in token".into()))?;

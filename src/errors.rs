@@ -25,6 +25,9 @@ pub enum AppError {
     #[error("Unauthorized")]
     Unauthorized,
 
+    #[error("Forbidden: {0}")]
+    Forbidden(String),
+
     // OAuth2 错误
     #[error("Invalid OAuth2 client")]
     InvalidClient,
@@ -65,6 +68,7 @@ impl AppError {
             AppError::TokenExpired => "E004",
             AppError::InvalidToken => "E005",
             AppError::Unauthorized => "E006",
+            AppError::Forbidden(_) => "E016",
             AppError::InvalidClient => "E007",
             AppError::InvalidAuthCode => "E008",
             AppError::InvalidRedirectUri => "E009",
@@ -86,6 +90,7 @@ impl AppError {
             AppError::TokenExpired => "Token Expired",
             AppError::InvalidToken => "Invalid Token",
             AppError::Unauthorized => "Unauthorized",
+            AppError::Forbidden(_) => "Forbidden",
             AppError::InvalidClient => "Invalid Client",
             AppError::InvalidAuthCode => "Invalid Authorization Code",
             AppError::InvalidRedirectUri => "Invalid Redirect URI",
@@ -140,6 +145,8 @@ impl ResponseError for AppError {
             | AppError::InvalidToken
             | AppError::Unauthorized => StatusCode::UNAUTHORIZED,
 
+            AppError::Forbidden(_) => StatusCode::FORBIDDEN,
+
             AppError::NotFound => StatusCode::NOT_FOUND,
 
             AppError::BadRequest(_)
@@ -163,6 +170,7 @@ impl ResponseError for AppError {
             AppError::TokenExpired => "token_expired",
             AppError::InvalidToken => "invalid_token",
             AppError::Unauthorized => "unauthorized",
+            AppError::Forbidden(_) => "forbidden",
             AppError::InvalidClient => "invalid_client",
             AppError::InvalidAuthCode => "invalid_grant",
             AppError::InvalidRedirectUri => "invalid_request",

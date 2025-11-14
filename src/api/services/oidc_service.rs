@@ -104,7 +104,7 @@ pub async fn userinfo(
         .ok_or(AppError::Unauthorized)?;
 
     // 解析 user_id
-    let user_id: i32 = claims
+    let user_id: i64 = claims
         .sub
         .parse()
         .map_err(|_| AppError::Internal("Invalid user_id in token".into()))?;

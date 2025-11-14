@@ -6,7 +6,7 @@ use std::sync::Arc;
 use crate::cache::CompositeCache;
 use crate::errors::AppError;
 use crate::security::{JwtManager, generate_random_token};
-use crate::storage::{ClientRepository, SeaOrmBackend, TokenRepository};
+use crate::storage::{ClientRepository, SeaOrmBackend, TokenRepository, UserRepository};
 
 #[derive(Debug, Deserialize)]
 pub struct AuthorizeRequest {
@@ -164,20 +164,28 @@ pub async fn token(
         return Err(AppError::InvalidRedirectUri);
     }
 
-    // 6. 生成 access_token 和 refresh_token
+    // 6. 查询用户获取 role
+    let user = storage
+        .find_by_id(auth_data.user_id)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
+    // 7. 生成 access_token 和 refresh_token
     let access_token = jwt_manager.generate_token(
         auth_data.user_id as i64,
         config.auth.access_token_expire,
         Some(parse_scopes(&auth_data.scopes)),
+        &user.role,
     )?;
 
     let refresh_token = jwt_manager.generate_token(
         auth_data.user_id as i64,
         config.auth.refresh_token_expire,
         Some(vec!["refresh".to_string()]),
+        &user.role,
     )?;
 
-    // 7. 保存 token 到数据库
+    // 8. 保存 token 到数据库
     let access_token_id = storage
         .save_access_token(
             &access_token,

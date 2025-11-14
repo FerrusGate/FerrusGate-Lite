@@ -4,20 +4,17 @@ use sea_orm::entity::prelude::*;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel, Serialize, Deserialize)]
-#[sea_orm(table_name = "authorization_codes")]
+#[sea_orm(table_name = "invite_codes")]
 pub struct Model {
     #[sea_orm(primary_key)]
     pub id: i64,
     #[sea_orm(unique)]
     pub code: String,
-    pub client_id: String,
-    pub user_id: i64,
-    #[sea_orm(column_type = "Text")]
-    pub redirect_uri: String,
-    #[sea_orm(column_type = "Text")]
-    pub scopes: String,
-    pub expires_at: DateTimeWithTimeZone,
-    pub used: bool,
+    pub created_by: i64,
+    pub used_by: Option<i64>,
+    pub max_uses: i64,
+    pub used_count: i64,
+    pub expires_at: Option<DateTimeWithTimeZone>,
     pub created_at: DateTimeWithTimeZone,
 }
 
@@ -25,18 +22,20 @@ pub struct Model {
 pub enum Relation {
     #[sea_orm(
         belongs_to = "super::users::Entity",
-        from = "Column::UserId",
+        from = "Column::UsedBy",
+        to = "super::users::Column::Id",
+        on_update = "NoAction",
+        on_delete = "SetNull"
+    )]
+    Users2,
+    #[sea_orm(
+        belongs_to = "super::users::Entity",
+        from = "Column::CreatedBy",
         to = "super::users::Column::Id",
         on_update = "NoAction",
         on_delete = "Cascade"
     )]
-    Users,
-}
-
-impl Related<super::users::Entity> for Entity {
-    fn to() -> RelationDef {
-        Relation::Users.def()
-    }
+    Users1,
 }
 
 impl ActiveModelBehavior for ActiveModel {}

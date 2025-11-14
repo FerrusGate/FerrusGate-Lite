@@ -8,6 +8,7 @@ pub struct Claims {
     pub exp: i64,                   // 过期时间戳
     pub iat: i64,                   // 签发时间戳
     pub scope: Option<Vec<String>>, // 权限范围（可选）
+    pub role: String,               // 用户角色
 }
 
 pub struct JwtManager {
@@ -25,6 +26,7 @@ impl JwtManager {
         user_id: i64,
         expire_in: i64,
         scope: Option<Vec<String>>,
+        role: &str,
     ) -> Result<String, AppError> {
         let now = chrono::Utc::now().timestamp();
         let claims = Claims {
@@ -32,6 +34,7 @@ impl JwtManager {
             exp: now + expire_in,
             iat: now,
             scope,
+            role: role.to_string(),
         };
 
         encode(
@@ -76,10 +79,11 @@ mod tests {
     #[test]
     fn test_jwt_generate_and_verify() {
         let manager = JwtManager::new("test-secret-key-at-least-32-characters-long".to_string());
-        let token = manager.generate_token(123, 3600, None).unwrap();
+        let token = manager.generate_token(123, 3600, None, "user").unwrap();
 
         let claims = manager.verify_token(&token).unwrap();
         assert_eq!(claims.sub, "123");
+        assert_eq!(claims.role, "user");
 
         let user_id = manager.extract_user_id(&token).unwrap();
         assert_eq!(user_id, 123);
@@ -89,7 +93,7 @@ mod tests {
     fn test_jwt_expired_token() {
         let manager = JwtManager::new("test-secret-key-at-least-32-characters-long".to_string());
         // 过期时间设为 -1 秒（已过期）
-        let token = manager.generate_token(123, -1, None).unwrap();
+        let token = manager.generate_token(123, -1, None, "user").unwrap();
 
         let result = manager.verify_token(&token);
         assert!(matches!(result, Err(AppError::TokenExpired)));

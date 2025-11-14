@@ -13,7 +13,7 @@ pub trait UserRepository: Send + Sync {
         email: &str,
         password_hash: &str,
     ) -> Result<users::Model, AppError>;
-    async fn find_by_id(&self, id: i32) -> Result<Option<users::Model>, AppError>;
+    async fn find_by_id(&self, id: i64) -> Result<Option<users::Model>, AppError>;
     async fn find_by_username(&self, username: &str) -> Result<Option<users::Model>, AppError>;
     async fn find_by_email(&self, email: &str) -> Result<Option<users::Model>, AppError>;
 }
@@ -39,7 +39,7 @@ pub trait TokenRepository: Send + Sync {
         &self,
         code: &str,
         client_id: &str,
-        user_id: i32,
+        user_id: i64,
         redirect_uri: &str,
         scopes: &str,
         expires_at: chrono::DateTime<Utc>,
@@ -54,15 +54,15 @@ pub trait TokenRepository: Send + Sync {
         &self,
         token: &str,
         client_id: &str,
-        user_id: i32,
+        user_id: i64,
         scopes: &str,
         expires_at: chrono::DateTime<Utc>,
-    ) -> Result<i32, AppError>;
+    ) -> Result<i64, AppError>;
 
     async fn save_refresh_token(
         &self,
         token: &str,
-        access_token_id: i32,
+        access_token_id: i64,
         expires_at: chrono::DateTime<Utc>,
     ) -> Result<(), AppError>;
 }

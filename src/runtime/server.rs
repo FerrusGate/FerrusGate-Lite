@@ -12,8 +12,8 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
 
     tracing::info!("Starting HTTP server on {}", bind_addr);
 
-    // 创建存储后端
-    let storage = Arc::new(SeaOrmBackend::new(ctx.db.clone()));
+    // 创建存储后端（带缓存）
+    let storage = Arc::new(SeaOrmBackend::with_cache(ctx.db.clone(), ctx.cache.clone()));
 
     HttpServer::new(move || {
         App::new()
@@ -37,7 +37,8 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
             .service(
                 web::scope("/api/auth")
                     .route("/register", web::post().to(services::register))
-                    .route("/login", web::post().to(services::login)),
+                    .route("/login", web::post().to(services::login))
+                    .route("/verify-invite", web::post().to(services::invite_verify)),
             )
             // OAuth2 授权端点
             .service(
@@ -79,6 +80,29 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
                         "/authorizations/{client_id}",
                         web::delete().to(services::user_revoke_authorization),
                     ),
+            )
+            // 管理员 API（需要管理员权限）
+            .service(
+                web::scope("/api/admin")
+                    .wrap(app_middleware::AdminOnly::new(
+                        ctx.jwt_manager.clone(),
+                        ctx.cache.clone(),
+                        storage.clone(),
+                    ))
+                    // 配置管理
+                    .route(
+                        "/settings/registration",
+                        web::get().to(services::settings_get_registration_config),
+                    )
+                    .route(
+                        "/settings/registration",
+                        web::put().to(services::settings_update_registration_config),
+                    )
+                    // 邀请码管理
+                    .route("/invites", web::post().to(services::invite_create))
+                    .route("/invites", web::get().to(services::invite_list))
+                    .route("/invites/stats", web::get().to(services::invite_get_stats))
+                    .route("/invites/{code}", web::delete().to(services::invite_revoke)),
             )
     })
     .bind(&bind_addr)?
