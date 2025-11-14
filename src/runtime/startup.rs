@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tracing_appender::non_blocking::WorkerGuard;
 
 use crate::cache::{CompositeCache, MemoryCache, RedisCache};
-use crate::config::{AppConfig, CacheConfig, RedisConfig};
+use crate::config::{CacheConfig, RedisConfig, get_config};
 use crate::errors::AppError;
 use crate::security::JwtManager;
 use crate::storage::{connect, run_migrations};
@@ -13,12 +13,14 @@ pub struct StartupContext {
     pub db: Arc<DatabaseConnection>,
     pub cache: Arc<CompositeCache>,
     pub jwt_manager: Arc<JwtManager>,
-    pub config: AppConfig,
     _log_guard: WorkerGuard,
 }
 
 /// 初始化服务器
-pub async fn prepare_server(config: AppConfig) -> Result<StartupContext, AppError> {
+pub async fn prepare_server() -> Result<StartupContext, AppError> {
+    // 获取全局配置
+    let config = get_config();
+
     // 1. 初始化 Rust-TLS
     rustls::crypto::ring::default_provider()
         .install_default()
@@ -29,7 +31,7 @@ pub async fn prepare_server(config: AppConfig) -> Result<StartupContext, AppErro
     tracing::info!("FerrusGate-Lite v0.0.1 starting...");
 
     // 3. 验证配置
-    config.validate()?;
+    config.validate().map_err(AppError::Config)?;
 
     // 4. 初始化数据库
     tracing::info!("Connecting to database: {}", config.database.url);
@@ -55,7 +57,6 @@ pub async fn prepare_server(config: AppConfig) -> Result<StartupContext, AppErro
         db: Arc::new(db),
         cache: Arc::new(cache),
         jwt_manager,
-        config,
         _log_guard: log_guard,
     })
 }

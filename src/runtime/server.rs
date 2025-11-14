@@ -2,11 +2,13 @@ use actix_web::{App, HttpServer, middleware, web};
 use std::sync::Arc;
 
 use crate::api::{middleware as app_middleware, services};
+use crate::config::get_config;
 use crate::runtime::startup::StartupContext;
 use crate::storage::SeaOrmBackend;
 
 pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
-    let bind_addr = format!("{}:{}", ctx.config.server.host, ctx.config.server.port);
+    let config = get_config();
+    let bind_addr = format!("{}:{}", config.server.host, config.server.port);
 
     tracing::info!("Starting HTTP server on {}", bind_addr);
 
@@ -20,7 +22,6 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
             .app_data(web::Data::new(storage.clone()))
             .app_data(web::Data::new(ctx.cache.clone()))
             .app_data(web::Data::new(ctx.jwt_manager.clone()))
-            .app_data(web::Data::new(ctx.config.clone()))
             // 中间件
             .wrap(middleware::Logger::default())
             .wrap(middleware::Compress::default())
