@@ -79,9 +79,11 @@ impl AppConfig {
 
         // 如果需要,创建父目录
         if let Some(parent) = Path::new(path).parent()
-            && !parent.as_os_str().is_empty() && !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+            && !parent.as_os_str().is_empty()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?;
+        }
 
         fs::write(path, content)?;
         Ok(())
@@ -215,9 +217,11 @@ impl AppConfig {
 
         // 如果需要,创建父目录
         if let Some(parent) = path.as_ref().parent()
-            && !parent.as_os_str().is_empty() && !parent.exists() {
-                fs::create_dir_all(parent)?;
-            }
+            && !parent.as_os_str().is_empty()
+            && !parent.exists()
+        {
+            fs::create_dir_all(parent)?;
+        }
 
         fs::write(path, content)?;
         Ok(())

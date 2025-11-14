@@ -51,6 +51,9 @@ pub async fn prepare_server() -> Result<StartupContext, AppError> {
     let jwt_manager = Arc::new(JwtManager::new(config.auth.jwt_secret.clone()));
     tracing::info!("JWT manager initialized");
 
+    // 8. 检查并显示组件状态
+    check_components_status();
+
     tracing::info!("Server initialization complete");
 
     Ok(StartupContext {
@@ -85,4 +88,63 @@ async fn init_cache(
         memory_cache as Arc<dyn crate::cache::Cache>,
         redis_cache,
     ))
+}
+
+/// 检查并显示组件状态
+fn check_components_status() {
+    let config = get_config();
+
+    tracing::info!("==========================================");
+    tracing::info!("  组件状态检查");
+    tracing::info!("==========================================");
+
+    // 检查服务器配置
+    tracing::info!(
+        "[OK] HTTP 服务器: {}:{}",
+        config.server.host,
+        config.server.port
+    );
+
+    // 检查数据库
+    tracing::info!("[OK] 数据库: {}", config.database.url);
+
+    // 检查缓存配置
+    if config.cache.enable_memory_cache {
+        tracing::info!(
+            "[OK] 内存缓存: 已启用 (容量: {})",
+            config.cache.memory_cache_size
+        );
+    } else {
+        tracing::warn!("[-] 内存缓存: 已禁用");
+    }
+
+    if config.cache.enable_redis_cache {
+        tracing::info!("[OK] Redis 缓存: 已启用 ({})", config.redis.url);
+    } else {
+        tracing::warn!("[-] Redis 缓存: 已禁用");
+    }
+
+    // 检查 JWT 配置
+    if config.auth.jwt_secret.len() >= 32 {
+        tracing::info!("[OK] JWT 认证: 已配置");
+    } else {
+        tracing::warn!("[!] JWT Secret 长度不足 32 字符");
+    }
+
+    // 检查 Token 过期时间
+    tracing::info!(
+        "[OK] Token 配置: Access={}s, Refresh={}s, AuthCode={}s",
+        config.auth.access_token_expire,
+        config.auth.refresh_token_expire,
+        config.auth.authorization_code_expire
+    );
+
+    // 检查功能端点
+    tracing::info!("[OK] OAuth2/OIDC: 已启用");
+    tracing::info!("  - /oauth/authorize    (授权端点)");
+    tracing::info!("  - /oauth/token        (Token 端点)");
+    tracing::info!("  - /oauth/userinfo     (用户信息)");
+    tracing::info!("  - /.well-known/openid-configuration (Discovery)");
+
+    tracing::info!("==========================================");
 }

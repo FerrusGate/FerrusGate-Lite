@@ -55,6 +55,77 @@ pub enum AppError {
     Config(String),
 }
 
+impl AppError {
+    /// 获取错误代码
+    pub fn code(&self) -> &'static str {
+        match self {
+            AppError::Database(_) => "E001",
+            AppError::Redis(_) => "E002",
+            AppError::InvalidCredentials => "E003",
+            AppError::TokenExpired => "E004",
+            AppError::InvalidToken => "E005",
+            AppError::Unauthorized => "E006",
+            AppError::InvalidClient => "E007",
+            AppError::InvalidAuthCode => "E008",
+            AppError::InvalidRedirectUri => "E009",
+            AppError::InvalidGrantType => "E010",
+            AppError::InvalidScope => "E011",
+            AppError::NotFound => "E012",
+            AppError::BadRequest(_) => "E013",
+            AppError::Internal(_) => "E014",
+            AppError::Config(_) => "E015",
+        }
+    }
+
+    /// 获取错误类型名称
+    pub fn error_type(&self) -> &'static str {
+        match self {
+            AppError::Database(_) => "Database Error",
+            AppError::Redis(_) => "Redis Error",
+            AppError::InvalidCredentials => "Invalid Credentials",
+            AppError::TokenExpired => "Token Expired",
+            AppError::InvalidToken => "Invalid Token",
+            AppError::Unauthorized => "Unauthorized",
+            AppError::InvalidClient => "Invalid Client",
+            AppError::InvalidAuthCode => "Invalid Authorization Code",
+            AppError::InvalidRedirectUri => "Invalid Redirect URI",
+            AppError::InvalidGrantType => "Invalid Grant Type",
+            AppError::InvalidScope => "Invalid Scope",
+            AppError::NotFound => "Not Found",
+            AppError::BadRequest(_) => "Bad Request",
+            AppError::Internal(_) => "Internal Server Error",
+            AppError::Config(_) => "Configuration Error",
+        }
+    }
+
+    /// 获取错误详情
+    pub fn message(&self) -> String {
+        self.to_string()
+    }
+
+    /// 格式化为彩色输出（用于日志）
+    pub fn format_colored(&self) -> String {
+        use colored::Colorize;
+        format!(
+            "{} {} {}\n  {}",
+            "[ERROR]".red().bold(),
+            self.code().yellow(),
+            self.error_type().red(),
+            self.message().white()
+        )
+    }
+
+    /// 格式化为简洁输出
+    pub fn format_simple(&self) -> String {
+        format!(
+            "[{}] {}: {}",
+            self.code(),
+            self.error_type(),
+            self.message()
+        )
+    }
+}
+
 #[derive(Serialize)]
 struct ErrorResponse {
     error: String,
