@@ -178,12 +178,24 @@ pub async fn login(
         .await?
         .ok_or(AppError::InvalidCredentials)?;
 
-    // 2. 验证密码
+    // 2. 检查用户状态
+    if user.deleted_at.is_some() {
+        return Err(AppError::Forbidden("User account has been deleted".into()));
+    }
+
+    if !user.is_active {
+        return Err(AppError::Forbidden("User account is disabled".into()));
+    }
+
+    // 3. 验证密码
     if !PasswordManager::verify_password(&req.password, &user.password_hash)? {
         return Err(AppError::InvalidCredentials);
     }
 
-    // 3. 生成 Token
+    // 4. 更新登录信息
+    let _ = storage.update_login_info(user.id).await; // 忽略错误，不影响登录
+
+    // 5. 生成 Token
     let access_token = jwt_manager.generate_token(
         user.id as i64,
         config.auth.access_token_expire,
@@ -198,7 +210,7 @@ pub async fn login(
         &user.role,
     )?;
 
-    // 4. 缓存 Token -> UserID 映射
+    // 6. 缓存 Token -> UserID 映射
     cache
         .set(
             &format!("token:{}", access_token),

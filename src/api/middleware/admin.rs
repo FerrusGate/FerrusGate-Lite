@@ -110,6 +110,18 @@ where
                 .map_err(|e| -> Error { e.into() })?
                 .ok_or(AppError::Unauthorized)?;
 
+            // 检查用户是否已被软删除
+            if user.deleted_at.is_some() {
+                return Err(
+                    AppError::Forbidden("User account has been deleted".to_string()).into(),
+                );
+            }
+
+            // 检查用户是否被禁用
+            if !user.is_active {
+                return Err(AppError::Forbidden("User account is disabled".to_string()).into());
+            }
+
             // 检查用户角色是否为 admin
             if user.role != "admin" {
                 return Err(AppError::Forbidden("Admin access required".to_string()).into());

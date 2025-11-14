@@ -16,6 +16,10 @@ pub struct Model {
     pub created_at: DateTimeWithTimeZone,
     pub updated_at: DateTimeWithTimeZone,
     pub role: String,
+    pub is_active: bool,
+    pub deleted_at: Option<DateTimeWithTimeZone>,
+    pub last_login_at: Option<DateTimeWithTimeZone>,
+    pub login_count: i64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

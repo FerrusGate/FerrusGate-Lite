@@ -1,3 +1,4 @@
+pub mod admin_user_service;
 pub mod auth_service;
 pub mod health;
 pub mod invite_service;
@@ -35,4 +36,12 @@ pub use settings_service::{
 pub use invite_service::{
     create_invite as invite_create, get_stats as invite_get_stats, list_invites as invite_list,
     revoke_invite as invite_revoke, verify_invite as invite_verify,
+};
+
+// 管理员用户管理服务
+pub use admin_user_service::{
+    delete_user as admin_delete_user, get_user as admin_get_user,
+    get_user_stats as admin_get_user_stats, list_users as admin_list_users,
+    reset_password as admin_reset_password, update_role as admin_update_role,
+    update_status as admin_update_status,
 };

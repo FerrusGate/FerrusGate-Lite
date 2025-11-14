@@ -106,7 +106,27 @@ pub async fn run_server(ctx: StartupContext) -> std::io::Result<()> {
                     .route("/invites", web::post().to(services::invite_create))
                     .route("/invites", web::get().to(services::invite_list))
                     .route("/invites/stats", web::get().to(services::invite_get_stats))
-                    .route("/invites/{code}", web::delete().to(services::invite_revoke)),
+                    .route("/invites/{code}", web::delete().to(services::invite_revoke))
+                    // 用户管理
+                    .route("/users", web::get().to(services::admin_list_users))
+                    .route(
+                        "/users/stats",
+                        web::get().to(services::admin_get_user_stats),
+                    )
+                    .route("/users/{id}", web::get().to(services::admin_get_user))
+                    .route(
+                        "/users/{id}/role",
+                        web::patch().to(services::admin_update_role),
+                    )
+                    .route(
+                        "/users/{id}/status",
+                        web::patch().to(services::admin_update_status),
+                    )
+                    .route(
+                        "/users/{id}/reset-password",
+                        web::post().to(services::admin_reset_password),
+                    )
+                    .route("/users/{id}", web::delete().to(services::admin_delete_user)),
             )
     })
     .bind(&bind_addr)?
