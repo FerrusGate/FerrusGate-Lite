@@ -34,7 +34,7 @@ pub async fn prepare_server(config: AppConfig) -> Result<StartupContext, AppErro
     // 4. 初始化数据库
     tracing::info!("Connecting to database: {}", config.database.url);
     let db = connect(&config.database).await?;
-    tracing::info!("✓ Database connected");
+    tracing::info!("Database connected");
 
     // 5. 运行数据库迁移
     tracing::info!("Running database migrations...");
@@ -43,11 +43,11 @@ pub async fn prepare_server(config: AppConfig) -> Result<StartupContext, AppErro
     // 6. 初始化缓存
     tracing::info!("Initializing cache system...");
     let cache = init_cache(&config.cache, &config.redis).await?;
-    tracing::info!("✓ Cache initialized");
+    tracing::info!("Cache initialized");
 
     // 7. 初始化 JWT 管理器
     let jwt_manager = Arc::new(JwtManager::new(config.auth.jwt_secret.clone()));
-    tracing::info!("✓ JWT manager initialized");
+    tracing::info!("JWT manager initialized");
 
     tracing::info!("Server initialization complete");
 
@@ -69,12 +69,12 @@ async fn init_cache(
 
     let redis_cache = match RedisCache::new(redis_config).await {
         Ok(cache) => {
-            tracing::info!("✓ Redis cache connected");
+            tracing::info!("Redis cache connected");
             Arc::new(cache) as Arc<dyn crate::cache::Cache>
         }
         Err(e) => {
-            tracing::warn!("⚠ Redis connection failed: {}", e);
-            tracing::warn!("  Falling back to memory-only cache");
+            tracing::warn!("Redis connection failed: {}", e);
+            tracing::warn!("Falling back to memory-only cache");
             // 使用内存缓存作为fallback
             memory_cache.clone() as Arc<dyn crate::cache::Cache>
         }

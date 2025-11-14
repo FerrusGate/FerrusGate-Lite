@@ -9,7 +9,7 @@ async fn main() -> Result<(), AppError> {
     // 初始化服务器
     let ctx = prepare_server(config).await?;
 
-    tracing::info!("🚀 FerrusGate-Lite is ready!");
+    tracing::info!("FerrusGate-Lite is ready");
 
     // 启动 HTTP 服务器
     run_server(ctx)

@@ -113,8 +113,8 @@ pub async fn authorize(
         redirect_url.push_str(&format!("&state={}", state));
     }
 
-    // 返回 302 重定向
-    Ok(HttpResponse::Found()
+    // 返回 307 重定向
+    Ok(HttpResponse::TemporaryRedirect()
         .insert_header(("Location", redirect_url))
         .finish())
 }

@@ -5,8 +5,8 @@
 -- 密码: password123 (已通过 bcrypt 加密)
 INSERT INTO users (username, email, password_hash, created_at, updated_at)
 VALUES
-    ('testuser', 'test@example.com', '$2b$12$KIXxLVNzpUjE4lqhJxW8qeJZGZqXQHvNvR7h3h.fN7hC7qWZ5yN7i', datetime('now'), datetime('now')),
-    ('admin', 'admin@example.com', '$2b$12$KIXxLVNzpUjE4lqhJxW8qeJZGZqXQHvNvR7h3h.fN7hC7qWZ5yN7i', datetime('now'), datetime('now'));
+    ('testuser', 'test@example.com', '$argon2i$v=19$m=16,t=2,p=1$MTk3Mzl5c2Fk$PyyOvH/WHwhJAhmUyTOtkw', datetime('now'), datetime('now')),
+    ('admin', 'admin@example.com', '$argon2i$v=19$m=16,t=2,p=1$MTk3Mzl5c2Fk$PyyOvH/WHwhJAhmUyTOtkw', datetime('now'), datetime('now'));
 
 -- 插入测试 OAuth 客户端
 INSERT INTO o_auth_clients (client_id, client_secret, name, redirect_uris, allowed_scopes, created_at)

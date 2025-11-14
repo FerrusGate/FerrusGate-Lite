@@ -1,18 +1,31 @@
 use crate::errors::AppError;
+use argon2::{
+    Argon2,
+    password_hash::{PasswordHash, PasswordHasher, PasswordVerifier, SaltString, rand_core::OsRng},
+};
 
 pub struct PasswordManager;
 
 impl PasswordManager {
     /// 对密码进行哈希加密
     pub fn hash_password(password: &str) -> Result<String, AppError> {
-        bcrypt::hash(password, bcrypt::DEFAULT_COST)
+        let salt = SaltString::generate(&mut OsRng);
+        let argon2 = Argon2::default();
+
+        argon2
+            .hash_password(password.as_bytes(), &salt)
+            .map(|hash| hash.to_string())
             .map_err(|e| AppError::Internal(format!("Password hash failed: {}", e)))
     }
 
     /// 验证密码是否匹配
     pub fn verify_password(password: &str, hash: &str) -> Result<bool, AppError> {
-        bcrypt::verify(password, hash)
-            .map_err(|e| AppError::Internal(format!("Password verify failed: {}", e)))
+        let parsed_hash = PasswordHash::new(hash)
+            .map_err(|e| AppError::Internal(format!("Invalid password hash format: {}", e)))?;
+
+        Ok(Argon2::default()
+            .verify_password(password.as_bytes(), &parsed_hash)
+            .is_ok())
     }
 }
 

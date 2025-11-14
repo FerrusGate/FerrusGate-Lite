@@ -98,13 +98,7 @@ fn extract_bearer_token(req: &ServiceRequest) -> Result<String, AppError> {
     req.headers()
         .get("Authorization")
         .and_then(|h| h.to_str().ok())
-        .and_then(|h| {
-            if h.starts_with("Bearer ") {
-                Some(h[7..].to_string())
-            } else {
-                None
-            }
-        })
+        .and_then(|h| h.strip_prefix("Bearer ").map(|h_strip| h_strip.to_string()))
         .ok_or(AppError::Unauthorized)
 }
 

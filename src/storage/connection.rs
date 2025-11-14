@@ -41,25 +41,23 @@ pub async fn connect_generic(
         .idle_timeout(Duration::from_secs(8))
         .max_lifetime(Duration::from_secs(3600));
 
-    Database::connect(opt)
-        .await
-        .map_err(|e| AppError::Database(e))
+    Database::connect(opt).await.map_err(AppError::Database)
 }
 
 /// 智能连接数据库（自动识别类型）
 pub async fn connect(config: &DatabaseConfig) -> Result<DatabaseConnection, AppError> {
     if config.url.starts_with("sqlite://") || config.url.starts_with("sqlite:") {
-        tracing::info!("使用 SQLite 数据库（已启用 WAL 和性能优化）");
+        tracing::info!("Using SQLite database");
         connect_sqlite(&config.url).await
     } else if config.url.starts_with("postgres://") || config.url.starts_with("postgresql://") {
-        tracing::info!("使用 PostgreSQL 数据库");
+        tracing::info!("Using PostgreSQL database");
         connect_generic(&config.url, config).await
     } else if config.url.starts_with("mysql://") {
-        tracing::info!("使用 MySQL 数据库");
+        tracing::info!("Using MySQL database");
         connect_generic(&config.url, config).await
     } else {
         Err(AppError::Internal(format!(
-            "不支持的数据库类型: {}",
+            "Unsupported database type in URL: {}",
             config.url
         )))
     }
@@ -67,10 +65,8 @@ pub async fn connect(config: &DatabaseConfig) -> Result<DatabaseConnection, AppE
 
 /// 运行数据库迁移
 pub async fn run_migrations(db: &DatabaseConnection) -> Result<(), AppError> {
-    Migrator::up(db, None)
-        .await
-        .map_err(|e| AppError::Database(e))?;
+    Migrator::up(db, None).await.map_err(AppError::Database)?;
 
-    tracing::info!("✓ Database migrations completed");
+    tracing::info!("Database migrations completed");
     Ok(())
 }
